@@ -127,31 +127,6 @@ func StartListener() (func(), error) {
 	}, nil
 }
 
-type ReleaseState struct {
-	Internal ReleaseInternal    `json:"internal"`
-	Version  string             `json:"version"`
-	Process  ReleaseProcessView `json:"process"`
-}
-
-func getReleaseState(release *Release) *ReleaseState {
-	if !release.IsInstalled() {
-		return nil
-	}
-
-	var state *ReleaseState
-
-	if internal, err := release.GetInternal(); err == nil {
-		state.Internal = internal
-	}
-
-	if version, err := release.GetVersion(); err == nil {
-		state.Version = version
-	}
-
-	state.Process = release.View()
-	return state
-}
-
 type GlobalState struct {
 	Stable        *ReleaseState `json:"stable"`
 	PTB           *ReleaseState `json:"ptb"`
@@ -164,9 +139,9 @@ func BroadcastGlobalState() {
 	defer container.mu.Unlock()
 
 	buffer, err := json.Marshal(GlobalState{
-		Stable:        getReleaseState(&Stable),
-		PTB:           getReleaseState(&PTB),
-		Canary:        getReleaseState(&Canary),
+		Stable:        Stable.GetState(),
+		PTB:           PTB.GetState(),
+		Canary:        Canary.GetState(),
 		Configuration: GetConfiguration(),
 	})
 	if err != nil {

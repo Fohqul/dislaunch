@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -39,6 +40,7 @@ type Release struct {
 	message        string
 	progress       uint8 // indeterminate progress when 101
 	err            error
+	state          atomic.Value
 }
 
 var Stable, PTB, Canary Release
@@ -212,21 +214,47 @@ type ReleaseProcessView struct {
 	Error          string `json:"error"`
 }
 
-func (release *Release) View() ReleaseProcessView {
-	// HACK: can't acquire the mutex because that would prevent viewing while a process is ongoing
-	// this leads to a data race but hopefully that only leads to a stale frontend
-	errorMessage := ""
-	if err := release.err; err != nil {
-		errorMessage = err.Error()
+type ReleaseState struct {
+	Internal *ReleaseInternal    `json:"internal"`
+	Version  string              `json:"version"`
+	Process  *ReleaseProcessView `json:"process"`
+}
+
+func (release *Release) updateState() {
+	var state *ReleaseState
+
+	if internal, err := release.GetInternal(); err != nil {
+		state.Internal = &internal
+	} else {
+		state.Internal = nil
 	}
 
-	return ReleaseProcessView{
-		Status:         string(release.status),
-		ProgressWindow: release.progressWindow,
-		Message:        release.message,
-		Progress:       release.progress,
-		Error:          errorMessage,
+	if version, err := release.GetVersion(); err != nil {
+		state.Version = version
+	} else {
+		state.Version = ""
 	}
+
+	state.Process.Status = string(release.status)
+	state.Process.ProgressWindow = release.progressWindow
+	state.Process.Message = release.message
+	state.Process.Progress = release.progress
+	if release.err != nil {
+		state.Process.Error = release.err.Error()
+	} else {
+		state.Process.Error = ""
+	}
+
+	release.state.Store(state)
+	BroadcastGlobalState()
+}
+
+func (release *Release) GetState() *ReleaseState {
+	if !release.IsInstalled() {
+		return nil
+	}
+
+	return release.state.Load().(*ReleaseState)
 }
 
 func (release *Release) CheckForUpdates() {
@@ -244,6 +272,7 @@ func (release *Release) CheckForUpdates() {
 	release.status = UpdateCheck
 	release.message = "Checking for updates"
 	release.progress = 101
+	release.updateState()
 
 	url := "https://discord.com/api/" + release.String() + "/updates?platform=linux"
 	// TODO
@@ -316,7 +345,7 @@ func (release *Release) Uninstall() {
 	release.status = Uninstall
 	release.message = "Deleting " + internal.InstallPath
 	release.progress = 101
-	BroadcastGlobalState()
+	release.updateState()
 
 	// Scary!
 	// todo perhaps consider some safeguards to prevent deleting critical directories?
@@ -329,5 +358,5 @@ func (release *Release) Uninstall() {
 		release.status = Fatal
 		release.err = err
 	}
-	BroadcastGlobalState()
+	release.updateState()
 }
