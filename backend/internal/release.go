@@ -20,22 +20,22 @@ func download(source string, destination string, progress func(progress uint8)) 
 	return nil
 }
 
-type Status string
+type status string
 
 const (
-	None                   Status = ""
-	Download               Status = "download"
-	Install                Status = "install"
-	UpdateCheck            Status = "update_check"
-	BetterDiscordInjection Status = "bd_injection"
-	Move                   Status = "move"
-	Uninstall              Status = "uninstall"
-	Fatal                  Status = "fatal"
+	None                   status = ""
+	Download               status = "download"
+	Install                status = "install"
+	UpdateCheck            status = "update_check"
+	BetterDiscordInjection status = "bd_injection"
+	Move                   status = "move"
+	Uninstall              status = "uninstall"
+	Fatal                  status = "fatal"
 )
 
 type Release struct {
 	mu             sync.Mutex
-	status         Status
+	status         status
 	progressWindow bool
 	message        string
 	progress       uint8 // indeterminate progress when 101
@@ -52,7 +52,7 @@ const (
 	BDCanary BetterDiscordChannel = "canary"
 )
 
-type ReleaseInternal struct {
+type releaseInternal struct {
 	InstallPath          string               `json:"install_path"`
 	LastChecked          time.Time            `json:"last_checked"`
 	LatestVersion        string               `json:"latest_version"`
@@ -78,7 +78,7 @@ func (release *Release) getGobPath() string {
 	return filepath.Join(GetHomeXDGDirectory("XDG_STATE_HOME", filepath.Join(".local", "state")), release.String()+".gob")
 }
 
-func (release *Release) IsInstalled() bool {
+func (release *Release) isInstalled() bool {
 	_, err := os.Stat(release.getGobPath())
 	if err != nil {
 		return true
@@ -104,13 +104,13 @@ func (release *Release) openGob() *os.File {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err = gob.NewEncoder(file).Encode(ReleaseInternal{}); err != nil {
+	if err = gob.NewEncoder(file).Encode(releaseInternal{}); err != nil {
 		log.Fatal(err)
 	}
 	return file
 }
 
-func (release *Release) setInternal(internal ReleaseInternal) {
+func (release *Release) setInternal(internal releaseInternal) {
 	file := release.openGob()
 	defer file.Close()
 
@@ -119,27 +119,27 @@ func (release *Release) setInternal(internal ReleaseInternal) {
 	}
 }
 
-func (release *Release) GetInternal() (ReleaseInternal, error) {
-	if !release.IsInstalled() {
-		return ReleaseInternal{}, fmt.Errorf("release '%s' is not installed", release)
+func (release *Release) getInternal() (releaseInternal, error) {
+	if !release.isInstalled() {
+		return releaseInternal{}, fmt.Errorf("release '%s' is not installed", release)
 	}
 
 	file := release.openGob()
 	defer file.Close()
 
-	var internal ReleaseInternal
+	var internal releaseInternal
 	if err := gob.NewDecoder(file).Decode(&internal); err != nil {
 		release.mu.Lock()
 		defer release.mu.Unlock()
 		release.status = Fatal
 		release.err = err
-		return ReleaseInternal{}, err
+		return releaseInternal{}, err
 	}
 	return internal, nil
 }
 
 func (release *Release) setLastChecked(lastChecked time.Time) {
-	internal, err := release.GetInternal()
+	internal, err := release.getInternal()
 	if err != nil {
 		return
 	}
@@ -149,7 +149,7 @@ func (release *Release) setLastChecked(lastChecked time.Time) {
 }
 
 func (release *Release) SetBetterDiscordEnabled(betterDiscordEnabled bool) {
-	internal, err := release.GetInternal()
+	internal, err := release.getInternal()
 	if err != nil {
 		return
 	}
@@ -159,7 +159,7 @@ func (release *Release) SetBetterDiscordEnabled(betterDiscordEnabled bool) {
 }
 
 func (release *Release) SetBetterDiscordChannel(betterDiscordChannel BetterDiscordChannel) {
-	internal, err := release.GetInternal()
+	internal, err := release.getInternal()
 	if err != nil {
 		return
 	}
@@ -179,8 +179,8 @@ type buildInfo struct {
 	ReleaseChannel string `json:"releaseChannel"`
 }
 
-func (release *Release) GetVersion() (string, error) {
-	internal, err := release.GetInternal()
+func (release *Release) getVersion() (string, error) {
+	internal, err := release.getInternal()
 	if err != nil {
 		return "", err
 	}
@@ -206,7 +206,7 @@ func (release *Release) GetVersion() (string, error) {
 	return info.Version, nil
 }
 
-type ReleaseProcessView struct {
+type releaseProcessView struct {
 	Status         string `json:"status"`
 	ProgressWindow bool   `json:"progress_window"`
 	Message        string `json:"message"`
@@ -215,21 +215,21 @@ type ReleaseProcessView struct {
 }
 
 type ReleaseState struct {
-	Internal *ReleaseInternal    `json:"internal"`
+	Internal *releaseInternal    `json:"internal"`
 	Version  string              `json:"version"`
-	Process  *ReleaseProcessView `json:"process"`
+	Process  *releaseProcessView `json:"process"`
 }
 
 func (release *Release) updateState() {
 	var state *ReleaseState
 
-	if internal, err := release.GetInternal(); err != nil {
+	if internal, err := release.getInternal(); err != nil {
 		state.Internal = &internal
 	} else {
 		state.Internal = nil
 	}
 
-	if version, err := release.GetVersion(); err != nil {
+	if version, err := release.getVersion(); err != nil {
 		state.Version = version
 	} else {
 		state.Version = ""
@@ -250,7 +250,7 @@ func (release *Release) updateState() {
 }
 
 func (release *Release) GetState() *ReleaseState {
-	if !release.IsInstalled() {
+	if !release.isInstalled() {
 		return nil
 	}
 
@@ -258,7 +258,7 @@ func (release *Release) GetState() *ReleaseState {
 }
 
 func (release *Release) CheckForUpdates() {
-	internal, err := release.GetInternal()
+	internal, err := release.getInternal()
 	if err != nil {
 		return
 	}
@@ -279,8 +279,8 @@ func (release *Release) CheckForUpdates() {
 }
 
 func (release *Release) Install() {
-	internal, err := release.GetInternal()
-	if release.IsInstalled() && err != nil {
+	internal, err := release.getInternal()
+	if release.isInstalled() && err != nil {
 		return
 	}
 
@@ -294,7 +294,7 @@ func (release *Release) Install() {
 }
 
 func (release *Release) InjectBetterDiscord(channel BetterDiscordChannel) {
-	internal, err := release.GetInternal()
+	internal, err := release.getInternal()
 	if err != nil {
 		return
 	}
@@ -309,7 +309,7 @@ func (release *Release) InjectBetterDiscord(channel BetterDiscordChannel) {
 }
 
 func (release *Release) Move(path string) {
-	internal, err := release.GetInternal()
+	internal, err := release.getInternal()
 	if err != nil {
 		return
 	}
@@ -332,7 +332,7 @@ func (release *Release) Move(path string) {
 }
 
 func (release *Release) Uninstall() {
-	internal, err := release.GetInternal()
+	internal, err := release.getInternal()
 	if err != nil {
 		return
 	}
