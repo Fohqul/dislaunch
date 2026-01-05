@@ -37,17 +37,17 @@ func handleConnection(conn net.Conn) {
 		}
 		action := strings.Split(data, " ")
 
-		var release Release
+		var release *Release
 		switch action[0] {
 		case "state":
 			BroadcastGlobalState()
 			break
 		case "stable":
-			release = Stable
+			release = &Stable
 		case "ptb":
-			release = PTB
+			release = &PTB
 		case "canary":
-			release = Canary
+			release = &Canary
 			switch action[1] {
 			case "bd":
 				switch action[2] {
@@ -133,12 +133,12 @@ type ReleaseState struct {
 	Process  ReleaseProcessView `json:"process"`
 }
 
-func getReleaseState(release Release) *ReleaseState {
+func getReleaseState(release *Release) *ReleaseState {
 	if !release.IsInstalled() {
 		return nil
 	}
 
-	var state ReleaseState
+	var state *ReleaseState
 
 	if internal, err := release.GetInternal(); err == nil {
 		state.Internal = internal
@@ -148,8 +148,8 @@ func getReleaseState(release Release) *ReleaseState {
 		state.Version = version
 	}
 
-	state.Process = release.GetProcess().View()
-	return &state
+	state.Process = release.View()
+	return state
 }
 
 type GlobalState struct {
@@ -164,9 +164,9 @@ func BroadcastGlobalState() {
 	defer container.mu.Unlock()
 
 	buffer, err := json.Marshal(GlobalState{
-		Stable:        getReleaseState(Stable),
-		PTB:           getReleaseState(PTB),
-		Canary:        getReleaseState(Canary),
+		Stable:        getReleaseState(&Stable),
+		PTB:           getReleaseState(&PTB),
+		Canary:        getReleaseState(&Canary),
 		Configuration: GetConfiguration(),
 	})
 	if err != nil {
