@@ -53,8 +53,10 @@ func handleConnection(conn net.Conn) {
 				switch action[2] {
 				case "stable":
 					go release.InjectBetterDiscord(BDStable)
+					break
 				case "canary":
 					go release.InjectBetterDiscord(BDCanary)
+					break
 				default:
 					fmt.Fprintf(os.Stderr, "unknown BetterDiscord channel: %s\n", action[2])
 				}
