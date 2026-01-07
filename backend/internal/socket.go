@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 )
 
 var listener net.Listener
@@ -22,17 +24,36 @@ type connectionsContainer struct {
 var container connectionsContainer
 
 func handleConnection(conn net.Conn) {
+	container.mu.Lock()
 	if _, exists := container.connections[conn]; exists {
 		fmt.Fprintf(os.Stderr, "connection %p already exists?\n", conn)
+		container.mu.Unlock()
 		return
 	}
-	container.connections[conn] = struct{}{} // TODO cleanup and close dead connections
+	container.connections[conn] = struct{}{}
+	container.mu.Unlock()
+
 	reader := bufio.NewReader(conn)
 
 	for {
+		container.mu.Lock()
+		if _, exists := container.connections[conn]; !exists {
+			if err := conn.Close(); err != nil {
+				fmt.Fprintf(os.Stderr, "error closing connection: %w\n", err)
+			}
+			return
+		}
+		container.mu.Unlock()
+
 		data, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error reading buffered I/O: %w\n", err)
+			if err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+				container.mu.Lock()
+				defer container.mu.Unlock()
+				delete(container.connections, conn)
+			} else {
+				fmt.Fprintf(os.Stderr, "error reading buffered I/O: %w\n", err)
+			}
 			continue
 		}
 		action := strings.Split(data, " ")
@@ -104,6 +125,8 @@ func StartListener() (func(), error) {
 		return nil, fmt.Errorf("error creating socket at '%s': %w\n", socket, err)
 	}
 
+	container.connections = make(map[net.Conn]struct{})
+
 	go func() {
 		for {
 			conn, err := listener.Accept()
@@ -116,6 +139,9 @@ func StartListener() (func(), error) {
 	}()
 
 	return func() {
+		container.mu.Lock()
+		defer container.mu.Unlock()
+
 		if listener == nil {
 			fmt.Fprintln(os.Stderr, "error closing listener: no listener is running")
 			return
@@ -126,9 +152,7 @@ func StartListener() (func(), error) {
 		}
 
 		for conn, _ := range container.connections {
-			if err := conn.Close(); err != nil {
-				fmt.Fprintf(os.Stderr, "error closing connection: %w\n", err)
-			}
+			delete(container.connections, conn)
 		}
 	}, nil
 }
@@ -158,8 +182,11 @@ func BroadcastGlobalState() {
 
 	for conn, _ := range container.connections {
 		if _, err := conn.Write(message); err != nil {
-			fmt.Fprintf(os.Stderr, "error writing global state to connection: %w\n", err)
-			conn.Close()
+			if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+				delete(container.connections, conn)
+			} else {
+				fmt.Fprintf(os.Stderr, "error writing global state to connection: %w\n", err)
+			}
 		}
 	}
 }
