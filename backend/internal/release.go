@@ -258,14 +258,15 @@ func (release *Release) GetState() *ReleaseState {
 }
 
 func (release *Release) CheckForUpdates() {
+	if release.status == Fatal {
+		return
+	}
+
 	internal, err := release.getInternal()
 	if err != nil {
 		return
 	}
 
-	if release.status == Fatal {
-		return
-	}
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
@@ -294,14 +295,15 @@ func (release *Release) Install() {
 }
 
 func (release *Release) InjectBetterDiscord(channel BetterDiscordChannel) {
+	if release.status == Fatal {
+		return
+	}
+
 	internal, err := release.getInternal()
 	if err != nil {
 		return
 	}
 
-	if release.status == Fatal {
-		return
-	}
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
@@ -309,14 +311,15 @@ func (release *Release) InjectBetterDiscord(channel BetterDiscordChannel) {
 }
 
 func (release *Release) Move(path string) {
+	if release.status == Fatal {
+		return
+	}
+
 	internal, err := release.getInternal()
 	if err != nil {
 		return
 	}
 
-	if release.status == Fatal {
-		return
-	}
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
@@ -332,14 +335,15 @@ func (release *Release) Move(path string) {
 }
 
 func (release *Release) Uninstall() {
+	if release.status == Fatal {
+		return
+	}
+
 	internal, err := release.getInternal()
 	if err != nil {
 		return
 	}
 
-	if release.status == Fatal {
-		return
-	}
 	release.mu.Lock()
 	defer release.mu.Unlock()
 	release.status = Uninstall
