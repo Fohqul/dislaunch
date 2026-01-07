@@ -45,9 +45,13 @@ func handleConnection(conn net.Conn) {
 		case "stable":
 			release = &Stable
 		case "ptb":
-			release = &PTB
+			if release == nil {
+				release = &PTB
+			}
 		case "canary":
-			release = &Canary
+			if release == nil {
+				release = &Canary
+			}
 			switch action[1] {
 			case "bd":
 				switch action[2] {
