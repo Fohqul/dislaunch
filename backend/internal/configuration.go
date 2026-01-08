@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/gofrs/flock"
 )
 
 type Configuration struct {
@@ -16,17 +18,23 @@ type Configuration struct {
 	Error                        error  `json:"error"`
 }
 
-func openConfigurationFile() *os.File {
+func openConfigurationFile() (*os.File, func()) {
 	configurationDirectory, err := os.UserConfigDir()
 	if err != nil {
 		log.Fatalf("error getting configuration directory: %w\n", err)
 	}
 
-	configurationFile, err := os.Open(filepath.Join(configurationDirectory, "io.github.Fohqul.Dislaunch.json"))
+	path := filepath.Join(configurationDirectory, "io.github.Fohqul.Dislaunch.json")
+	lock := flock.New(path)
+
+	configurationFile, err := os.Open(path)
 	if err != nil {
 		log.Fatalf("error opening configuration file: %w\n", err)
 	}
-	return configurationFile
+	return configurationFile, func() {
+		configurationFile.Close()
+		lock.Unlock()
+	}
 }
 
 func assertWritePermissions(path string) error {
@@ -42,8 +50,8 @@ func assertWritePermissions(path string) error {
 }
 
 func GetConfiguration() Configuration {
-	configurationFile := openConfigurationFile()
-	defer configurationFile.Close()
+	configurationFile, close := openConfigurationFile()
+	defer close()
 
 	var configuration Configuration
 	if err := json.NewDecoder(configurationFile).Decode(&configuration); err != nil {
@@ -70,8 +78,8 @@ func SetConfiguration(configuration Configuration) error {
 		return err
 	}
 
-	configurationFile := openConfigurationFile()
-	defer configurationFile.Close()
+	configurationFile, close := openConfigurationFile()
+	defer close()
 
 	if err = json.NewEncoder(configurationFile).Encode(configuration); err != nil {
 		return err // todo should this be fatal?

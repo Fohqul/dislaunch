@@ -12,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/gofrs/flock"
 )
 
 func download(source string, destination string, progress func(progress uint8)) error {
@@ -91,11 +93,18 @@ func (release *Release) isInstalled() bool {
 	return false
 }
 
-func (release *Release) openGob() *os.File {
+func (release *Release) openGob() (*os.File, func()) {
 	path := release.getGobPath()
+	lock := flock.New(path)
+	// Whilst we would ideally allow `getInternal` to take a shared lock, it may be replaced with an exclusive lock by a call to `getInternal`. See https://pkg.go.dev/github.com/gofrs/flock#Flock.Lock
+	lock.Lock()
 	file, err := os.Open(path)
+	close := func() {
+		file.Close()
+		lock.Unlock()
+	}
 	if err == nil {
-		return file
+		return file, close
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
 		log.Fatal(err)
@@ -107,12 +116,12 @@ func (release *Release) openGob() *os.File {
 	if err = gob.NewEncoder(file).Encode(releaseInternal{}); err != nil {
 		log.Fatal(err)
 	}
-	return file
+	return file, close
 }
 
 func (release *Release) setInternal(internal releaseInternal) {
-	file := release.openGob()
-	defer file.Close()
+	file, close := release.openGob()
+	defer close()
 
 	if err := gob.NewEncoder(file).Encode(internal); err != nil {
 		log.Fatal(err)
@@ -124,8 +133,8 @@ func (release *Release) getInternal() (releaseInternal, error) {
 		return releaseInternal{}, fmt.Errorf("release '%s' is not installed", release)
 	}
 
-	file := release.openGob()
-	defer file.Close()
+	file, close := release.openGob()
+	defer close()
 
 	var internal releaseInternal
 	if err := gob.NewDecoder(file).Decode(&internal); err != nil {
