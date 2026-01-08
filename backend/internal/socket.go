@@ -61,10 +61,10 @@ func handleConnection(conn net.Conn) {
 			}
 			continue
 		}
-		action := strings.Split(data, " ")
+		command := strings.Split(data, " ")
 
 		var release *Release
-		switch action[0] {
+		switch command[0] {
 		case "state":
 			BroadcastGlobalState()
 			break
@@ -110,7 +110,7 @@ func handleConnection(conn net.Conn) {
 			// TODO
 			break
 		default:
-			fmt.Fprintf(os.Stderr, "unknown action: %s\n", action[0])
+			fmt.Fprintf(os.Stderr, "unknown action: %s\n", command[0])
 		}
 	}
 }
