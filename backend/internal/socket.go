@@ -12,13 +12,18 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 )
 
 var listener net.Listener
 
+// `mu` represents a lock on reading from and writing to the
+// `connections` map itself, whereas `connections[conn]`'s mutex
+// represents a lock on writing to that connection
+// todo there is almost certainly a better way of doing this
 type connectionsContainer struct {
 	mu          sync.Mutex
-	connections map[net.Conn]struct{}
+	connections map[net.Conn]*sync.Mutex
 }
 
 var container connectionsContainer
@@ -30,7 +35,7 @@ func handleConnection(conn net.Conn) {
 		container.mu.Unlock()
 		return
 	}
-	container.connections[conn] = struct{}{}
+	container.connections[conn] = &sync.Mutex{}
 	container.mu.Unlock()
 
 	reader := bufio.NewReader(conn)
@@ -125,7 +130,7 @@ func StartListener() (func(), error) {
 		return nil, fmt.Errorf("error creating socket at '%s': %w\n", socket, err)
 	}
 
-	container.connections = make(map[net.Conn]struct{})
+	container.connections = make(map[net.Conn]*sync.Mutex)
 
 	go func() {
 		for {
@@ -180,13 +185,24 @@ func BroadcastGlobalState() {
 	}
 	message := append(buffer, '\n')
 
-	for conn, _ := range container.connections {
-		if _, err := conn.Write(message); err != nil {
-			if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
-				delete(container.connections, conn)
-			} else {
-				fmt.Fprintf(os.Stderr, "error writing global state to connection: %w\n", err)
+	for conn, mu := range container.connections {
+		go func() {
+			mu.Lock()
+			defer mu.Unlock()
+
+			if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+				fmt.Fprintf(os.Stderr, "error setting write deadline: %w\n", err)
 			}
-		}
+
+			if _, err := conn.Write(message); err != nil {
+				if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+					container.mu.Lock()
+					defer container.mu.Unlock()
+					delete(container.connections, conn)
+				} else {
+					fmt.Fprintf(os.Stderr, "error writing global state to connection: %w\n", err)
+				}
+			}
+		}()
 	}
 }
