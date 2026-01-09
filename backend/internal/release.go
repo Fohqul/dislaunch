@@ -257,15 +257,15 @@ func (release *Release) updateState() {
 	var state *ReleaseState
 
 	if internal, err := release.getInternal(); err != nil {
-		state.Internal = &internal
-	} else {
 		state.Internal = nil
+	} else {
+		state.Internal = &internal
 	}
 
 	if version, err := release.getVersion(); err != nil {
-		state.Version = version
-	} else {
 		state.Version = ""
+	} else {
+		state.Version = version
 	}
 
 	state.Process.Status = string(release.status)
