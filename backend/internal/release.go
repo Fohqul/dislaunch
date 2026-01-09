@@ -108,18 +108,21 @@ func (release *Release) openGob() (*os.File, func()) {
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
 		release.status = Fatal
+		release.message = "Failed to open internal release data"
 		release.err = err
 		return nil, nil
 	}
 	file, err = os.Create(path)
 	if err != nil {
 		release.status = Fatal
+		release.message = "Failed to create internal release data"
 		release.err = err
 		release.updateState()
 		return nil, nil
 	}
 	if err = gob.NewEncoder(file).Encode(releaseInternal{}); err != nil {
 		release.status = Fatal
+		release.message = "Failed to encode internal data"
 		release.err = err
 		release.updateState()
 		return nil, nil
@@ -136,6 +139,7 @@ func (release *Release) setInternal(internal releaseInternal) error {
 
 	if err := gob.NewEncoder(file).Encode(internal); err != nil {
 		release.status = Fatal
+		release.message = "Failed to encode internal data"
 		release.err = err
 		release.updateState()
 		return err
@@ -159,6 +163,7 @@ func (release *Release) getInternal() (releaseInternal, error) {
 		release.mu.Lock()
 		defer release.mu.Unlock()
 		release.status = Fatal
+		release.message = "Failed to decode internal data"
 		release.err = err
 		return releaseInternal{}, err
 	}
@@ -227,6 +232,7 @@ func (release *Release) getVersion() (string, error) {
 		release.mu.Lock()
 		defer release.mu.Unlock()
 		release.status = Fatal
+		release.message = "Release is installed, but it reports an unexpected release channel"
 		release.err = fmt.Errorf("mismatched release channel: %s", info.ReleaseChannel)
 		return "", release.err
 	}
@@ -383,10 +389,12 @@ func (release *Release) Uninstall() {
 	if err = os.RemoveAll(internal.InstallPath); err != nil {
 		fmt.Fprintf(os.Stderr, "error uninstalling release '%s' from '%s': %w\n", release, internal.InstallPath, err)
 		release.status = Fatal
+		release.message = "Failed to uninstall"
 		release.err = err
 	} else if err = os.Remove(release.getGobPath()); err != nil {
 		fmt.Fprintf(os.Stderr, "error deleting gob for release '%s': %w\n", release, err)
 		release.status = Fatal
+		release.message = "Failed to delete internal data at '" + release.getGobPath() + "'"
 		release.err = err
 	}
 	release.updateState()
