@@ -127,10 +127,10 @@ func (release *Release) openGob() (*os.File, func()) {
 	return file, close
 }
 
-func (release *Release) setInternal(internal releaseInternal) {
+func (release *Release) setInternal(internal releaseInternal) error {
 	file, close := release.openGob()
 	if file == nil || close == nil {
-		return
+		return fmt.Errorf("error opening gob")
 	}
 	defer close()
 
@@ -138,7 +138,9 @@ func (release *Release) setInternal(internal releaseInternal) {
 		release.status = Fatal
 		release.err = err
 		release.updateState()
+		return err
 	}
+	return nil
 }
 
 func (release *Release) getInternal() (releaseInternal, error) {
@@ -163,34 +165,34 @@ func (release *Release) getInternal() (releaseInternal, error) {
 	return internal, nil
 }
 
-func (release *Release) setLastChecked(lastChecked time.Time) {
+func (release *Release) setLastChecked(lastChecked time.Time) error {
 	internal, err := release.getInternal()
 	if err != nil {
-		return
+		return err
 	}
 
 	internal.LastChecked = lastChecked
-	release.setInternal(internal)
+	return release.setInternal(internal)
 }
 
-func (release *Release) SetBetterDiscordEnabled(betterDiscordEnabled bool) {
+func (release *Release) SetBetterDiscordEnabled(betterDiscordEnabled bool) error {
 	internal, err := release.getInternal()
 	if err != nil {
-		return
+		return err
 	}
 
 	internal.BetterDiscordEnabled = betterDiscordEnabled
-	release.setInternal(internal)
+	return release.setInternal(internal)
 }
 
-func (release *Release) SetBetterDiscordChannel(betterDiscordChannel BetterDiscordChannel) {
+func (release *Release) SetBetterDiscordChannel(betterDiscordChannel BetterDiscordChannel) error {
 	internal, err := release.getInternal()
 	if err != nil {
-		return
+		return err
 	}
 
 	internal.BetterDiscordChannel = betterDiscordChannel
-	release.setInternal(internal)
+	return release.setInternal(internal)
 }
 
 /**
