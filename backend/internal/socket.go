@@ -58,6 +58,16 @@ func releaseCommand(release *Release, command []string) {
 	}
 }
 
+func setBoolean(set func(bool), setting string) {
+	if setting == "0" {
+		set(false)
+	} else if setting == "1" {
+		set(true)
+	} else {
+		fmt.Fprintf(os.Stderr, "invalid boolean setting: %s\n", setting)
+	}
+}
+
 func handleConnection(conn net.Conn) {
 	container.mu.Lock()
 	if _, exists := container.connections[conn]; exists {
@@ -107,7 +117,25 @@ func handleConnection(conn net.Conn) {
 			go releaseCommand(&Canary, command)
 			break
 		case "config":
-			// TODO
+			// i should be taken out back for nesting switch statements like this. there is certainly a better way of handling commands/subcommands/arguments
+			switch command[1] {
+			case "automatically_check_for_updates":
+				setBoolean(SetAutomaticallyCheckForUpdates, command[2])
+				break
+			case "notify_on_update_available":
+				setBoolean(SetNotifyOnUpdateAvailable, command[2])
+				break
+			case "automatically_install_updates":
+				setBoolean(SetAutomaticallyInstallUpdates, command[2])
+				break
+			case "default_install_path":
+				if err = SetDefaultInstallPath(command[2]); err != nil {
+					fmt.Fprintf(os.Stderr, "error setting default installation path: %w\n", err)
+				}
+				break
+			default:
+				fmt.Fprintf(os.Stderr, "unknown configuration option: %s\n", command[1])
+			}
 			break
 		default:
 			fmt.Fprintf(os.Stderr, "unknown action: %s\n", command[0])

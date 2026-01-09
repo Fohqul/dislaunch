@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/gofrs/flock"
 )
@@ -64,25 +65,73 @@ func GetConfiguration() Configuration {
 	return configuration
 }
 
-func SetConfiguration(configuration Configuration) error {
-	stat, err := os.Stat(configuration.DefaultInstallPath)
+func setConfiguration(configuration Configuration) error {
+	configurationFile, close := openConfigurationFile()
+	defer close()
+
+	if err := json.NewEncoder(configurationFile).Encode(configuration); err != nil {
+		return err // todo should this be fatal?
+	}
+
+	return nil
+}
+
+// Mutex prevents multiple writes happening at once.
+// Whilst there is already a flock on the configuration
+// file, the set functions must first get the current
+// configuration, modify the relevant setting and then
+// write the configuration back to the file. During the
+// modify, another set to a different option may occur,
+// which would leave the stored configuration stale and
+// would reset the different option upon being written.
+// Therefore, a mutex is used to prevent this.
+var mu sync.Mutex
+
+func SetAutomaticallyCheckForUpdates(setting bool) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	configuration := GetConfiguration()
+	configuration.AutomaticallyCheckForUpdates = setting
+	setConfiguration(configuration)
+}
+
+func SetNotifyOnUpdateAvailable(setting bool) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	configuration := GetConfiguration()
+	configuration.NotifyOnUpdateAvailable = setting
+	setConfiguration(configuration)
+}
+
+func SetAutomaticallyInstallUpdates(setting bool) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	configuration := GetConfiguration()
+	configuration.AutomaticallyInstallUpdates = setting
+	setConfiguration(configuration)
+}
+
+func SetDefaultInstallPath(path string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	stat, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
 	if !stat.IsDir() {
-		return fmt.Errorf("cannot install to non-directory: %s", configuration.DefaultInstallPath)
+		return fmt.Errorf("cannot install to non-directory: %s", path)
 	}
 
-	if err = assertWritePermissions(configuration.DefaultInstallPath); err != nil {
+	if err = assertWritePermissions(path); err != nil {
 		return err
 	}
 
-	configurationFile, close := openConfigurationFile()
-	defer close()
-
-	if err = json.NewEncoder(configurationFile).Encode(configuration); err != nil {
-		return err // todo should this be fatal?
-	}
-
+	configuration := GetConfiguration()
+	configuration.DefaultInstallPath = path
+	setConfiguration(configuration)
 	return nil
 }
