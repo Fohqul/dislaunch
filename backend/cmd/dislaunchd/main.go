@@ -12,6 +12,12 @@ import (
 	"github.com/gofrs/flock"
 )
 
+func unlock(lockfile *flock.Flock) {
+	if err := lockfile.Unlock(); err != nil {
+		fmt.Fprintf(os.Stderr, "error unlocking at '%s': %w\n", lockfile.Path(), err)
+	}
+}
+
 func main() {
 	lockfilePath := filepath.Join(dislaunch.GetRuntimeDirectory(), "dislaunch.sock")
 	lockfile := flock.New(lockfilePath)
@@ -25,15 +31,11 @@ func main() {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	close, err := dislaunch.StartListener()
 	if err != nil {
-		if err = lockfile.Unlock(); err != nil {
-			fmt.Fprintf(os.Stderr, "error unlocking at '%s': %w\n", lockfilePath, err)
-		}
+		unlock(lockfile)
 		log.Fatalf("error starting listener: %w\n", err)
 	}
 
 	<-signals
 	close()
-	if err = lockfile.Unlock(); err != nil {
-		log.Fatalf("error unlocking at '%s': %w\n", lockfilePath, err)
-	}
+	unlock(lockfile)
 }
