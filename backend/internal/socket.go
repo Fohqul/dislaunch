@@ -28,6 +28,36 @@ type connectionsContainer struct {
 
 var container connectionsContainer
 
+func releaseCommand(release *Release, command []string) {
+	switch command[1] {
+	case "bd":
+		switch command[2] {
+		case "stable":
+			go release.InjectBetterDiscord(BDStable)
+			break
+		case "canary":
+			go release.InjectBetterDiscord(BDCanary)
+			break
+		default:
+			fmt.Fprintf(os.Stderr, "unknown BetterDiscord channel: %s\n", command[2])
+		}
+		break
+	case "check_for_updates":
+		go release.CheckForUpdates()
+		break
+	case "install":
+		go release.Install()
+		break
+	case "move":
+		go release.Move(command[2])
+	case "uninstall":
+		go release.Uninstall()
+		break
+	default:
+		fmt.Fprintf(os.Stderr, "unknown argument: %s\n", command[1])
+	}
+}
+
 func handleConnection(conn net.Conn) {
 	container.mu.Lock()
 	if _, exists := container.connections[conn]; exists {
@@ -63,48 +93,18 @@ func handleConnection(conn net.Conn) {
 		}
 		command := strings.Split(data, " ")
 
-		var release *Release
 		switch command[0] {
 		case "state":
 			go BroadcastGlobalState()
 			break
 		case "stable":
-			release = &Stable
+			go releaseCommand(&Stable, command)
+			break
 		case "ptb":
-			if release == nil {
-				release = &PTB
-			}
+			go releaseCommand(&PTB, command)
+			break
 		case "canary":
-			if release == nil {
-				release = &Canary
-			}
-			switch action[1] {
-			case "bd":
-				switch action[2] {
-				case "stable":
-					go release.InjectBetterDiscord(BDStable)
-					break
-				case "canary":
-					go release.InjectBetterDiscord(BDCanary)
-					break
-				default:
-					fmt.Fprintf(os.Stderr, "unknown BetterDiscord channel: %s\n", action[2])
-				}
-				break
-			case "check_for_updates":
-				go release.CheckForUpdates()
-				break
-			case "install":
-				go release.Install()
-				break
-			case "move":
-				go release.Move(action[2])
-			case "uninstall":
-				go release.Uninstall()
-				break
-			default:
-				fmt.Fprintf(os.Stderr, "unknown argument: %s\n", action[1])
-			}
+			go releaseCommand(&Canary, command)
 			break
 		case "config":
 			// TODO
