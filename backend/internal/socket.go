@@ -145,7 +145,7 @@ func handleConnection(conn net.Conn) {
 
 func StartListener() (func(), error) {
 	if listener != nil {
-		return nil, fmt.Errorf("listener already started")
+		return nil, errors.New("listener already started")
 	}
 
 	socket := filepath.Join(GetRuntimeDirectory(), "dislaunch.sock")
