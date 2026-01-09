@@ -107,24 +107,37 @@ func (release *Release) openGob() (*os.File, func()) {
 		return file, close
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
-		log.Fatal(err)
+		release.status = Fatal
+		release.err = err
+		return nil, nil
 	}
 	file, err = os.Create(path)
 	if err != nil {
-		log.Fatal(err)
+		release.status = Fatal
+		release.err = err
+		release.updateState()
+		return nil, nil
 	}
 	if err = gob.NewEncoder(file).Encode(releaseInternal{}); err != nil {
-		log.Fatal(err)
+		release.status = Fatal
+		release.err = err
+		release.updateState()
+		return nil, nil
 	}
 	return file, close
 }
 
 func (release *Release) setInternal(internal releaseInternal) {
 	file, close := release.openGob()
+	if file == nil || close == nil {
+		return
+	}
 	defer close()
 
 	if err := gob.NewEncoder(file).Encode(internal); err != nil {
-		log.Fatal(err)
+		release.status = Fatal
+		release.err = err
+		release.updateState()
 	}
 }
 
@@ -134,6 +147,9 @@ func (release *Release) getInternal() (releaseInternal, error) {
 	}
 
 	file, close := release.openGob()
+	if file == nil || close == nil {
+		return releaseInternal{}, fmt.Errorf("error opening gob")
+	}
 	defer close()
 
 	var internal releaseInternal
