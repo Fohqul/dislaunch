@@ -66,7 +66,7 @@ func handleConnection(conn net.Conn) {
 		var release *Release
 		switch command[0] {
 		case "state":
-			BroadcastGlobalState()
+			go BroadcastGlobalState()
 			break
 		case "stable":
 			release = &Stable
