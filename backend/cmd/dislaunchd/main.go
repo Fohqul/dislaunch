@@ -22,9 +22,9 @@ func main() {
 	lockfilePath := filepath.Join(dislaunch.GetRuntimeDirectory(), "dislaunch.sock")
 	lockfile := flock.New(lockfilePath)
 	if locked, err := lockfile.TryLock(); err != nil {
-		log.Fatalf("error locking at '%s': %w\n", lockfilePath, err)
+		log.Fatalf("error locking at '%s': %w\nIs another instance of Dislaunch already running?\n", lockfilePath, err)
 	} else if !locked {
-		log.Fatalf("error locking at '%s'", lockfilePath)
+		log.Fatalf("error locking at '%s'\nIs another instance of Dislaunch already running?\n", lockfilePath)
 	}
 
 	signals := make(chan os.Signal, 1)

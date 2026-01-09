@@ -25,7 +25,7 @@ func GetHomeXDGDirectory(environment string, fallback string) string {
 	if directory == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			log.Fatal(err) // if we couldn't get the user's home directory, then the situation is so fucked we may as well crash
+			log.Fatalf("error getting user home directory: %w", err) // if we couldn't get the user's home directory, then the situation is so fucked we may as well crash
 		}
 		directory = filepath.Join(home, fallback)
 	}
@@ -35,13 +35,13 @@ func GetHomeXDGDirectory(environment string, fallback string) string {
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			if err := os.MkdirAll(directory, 0700); err != nil {
-				log.Fatal(err)
+				log.Fatalf("error creating XDG directory in user home '%s': %w\n", directory, err)
 			}
 		} else {
-			log.Fatal(err)
+			log.Fatalf("error accessing XDG directory in user home '%s': %w\n", directory, err)
 		}
 	} else if !stat.IsDir() {
-		log.Fatal("XDG directory path is a file")
+		log.Fatal("XDG path in user home is not a directory: " + directory)
 	}
 	return directory
 }
