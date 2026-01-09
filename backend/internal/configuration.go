@@ -15,7 +15,6 @@ type Configuration struct {
 	NotifyOnUpdateAvailable      bool   `json:"notify_on_update_available"`
 	AutomaticallyInstallUpdates  bool   `json:"automatically_install_updates"`
 	DefaultInstallPath           string `json:"default_install_path"`
-	Error                        error  `json:"error"`
 }
 
 func openConfigurationFile() (*os.File, func()) {
