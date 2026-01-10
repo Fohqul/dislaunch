@@ -287,7 +287,11 @@ func (release *Release) GetState() *ReleaseState {
 		return nil
 	}
 
-	return release.state.Load().(*ReleaseState)
+	if value := release.state.Load(); value != nil {
+		return value.(*ReleaseState)
+	}
+
+	return nil
 }
 
 func (release *Release) CheckForUpdates() {
