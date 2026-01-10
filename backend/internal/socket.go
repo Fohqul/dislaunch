@@ -18,32 +18,24 @@ import (
 
 var listener net.Listener
 
-// `mu` represents a lock on reading from and writing to the
-// `connections` map itself, whereas `connections[conn]`'s mutex
-// represents a lock on writing to that connection
-// todo there is almost certainly a better way of doing this
+type connectionEntry struct {
+	wg    sync.WaitGroup
+	write chan []byte
+	close chan byte
+}
+
 type connectionsContainer struct {
 	mu          sync.Mutex
-	connections map[net.Conn]*sync.Mutex
+	connections map[net.Conn]*connectionEntry
 }
 
 var container connectionsContainer
-
-func closeConnection(conn net.Conn) {
-	log.Println("Closing connection", conn)
-	delete(container.connections, conn)
-
-	if err := conn.Close(); err != nil {
-		fmt.Fprintf(os.Stderr, "error closing connection: %s\n", err)
-	}
-}
 
 func connectionOpen(conn net.Conn) bool {
 	container.mu.Lock()
 	defer container.mu.Unlock()
 
 	if _, exists := container.connections[conn]; listener == nil || !exists {
-		closeConnection(conn)
 		return false
 	}
 
@@ -84,27 +76,14 @@ func setBoolean(set func(bool), setting string) {
 	}
 }
 
-func handleConnection(conn net.Conn) {
-	container.mu.Lock()
-	if _, exists := container.connections[conn]; exists {
-		fmt.Fprintf(os.Stderr, "connection %p already exists?\n", conn)
-		container.mu.Unlock()
-		return
-	}
-	container.connections[conn] = &sync.Mutex{}
-	container.mu.Unlock()
-	log.Println("Accepted connection", conn)
-
+func startReader(conn net.Conn, entry *connectionEntry) {
 	reader := bufio.NewReader(conn)
 
 	for connectionOpen(conn) {
 		data, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
-				container.mu.Lock()
-				defer container.mu.Unlock()
-				closeConnection(conn)
-				return
+				break
 			}
 
 			fmt.Fprintf(os.Stderr, "error reading buffered I/O: %s\n", err)
@@ -142,6 +121,56 @@ func handleConnection(conn net.Conn) {
 			fmt.Fprintf(os.Stderr, "unknown action: %s\n", command[0])
 		}
 	}
+
+	entry.close <- 0
+}
+
+func startWriter(conn net.Conn, entry *connectionEntry) {
+	for message := range entry.write {
+		if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+			fmt.Fprintf(os.Stderr, "error setting write deadline: %s\n", err)
+		}
+
+		if _, err := conn.Write(message); err != nil {
+			if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+				break
+			} else {
+				fmt.Fprintf(os.Stderr, "error writing to connection: %s\nMessage: %s", err, message)
+			}
+		}
+	}
+
+	entry.wg.Done()
+	entry.close <- 0
+}
+
+func handleConnection(conn net.Conn) {
+	container.mu.Lock()
+	if _, exists := container.connections[conn]; exists {
+		fmt.Fprintf(os.Stderr, "connection %p already exists?\n", conn)
+		container.mu.Unlock()
+		return
+	}
+	entry := &connectionEntry{write: make(chan []byte), close: make(chan byte)}
+	container.connections[conn] = entry
+	container.mu.Unlock()
+	log.Println("Accepted connection", conn)
+
+	go startReader(conn, entry)
+	entry.wg.Go(func() {
+		startWriter(conn, entry)
+	})
+
+	<-entry.close
+	container.mu.Lock()
+	delete(container.connections, conn)
+	container.mu.Unlock()
+	log.Println("Closing connection", conn)
+	close(entry.write)
+	entry.wg.Wait()
+	if err := conn.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "error closing connection: %s\n", err)
+	}
 }
 
 func StartListener() (func(), error) {
@@ -161,7 +190,7 @@ func StartListener() (func(), error) {
 	}
 	log.Println("Listener started at " + socket)
 
-	container.connections = make(map[net.Conn]*sync.Mutex)
+	container.connections = make(map[net.Conn]*connectionEntry)
 
 	go func() {
 		for {
@@ -188,14 +217,10 @@ func StartListener() (func(), error) {
 		}
 		listener = nil
 
-		for conn, mu := range container.connections {
-			go func() {
-				container.mu.Lock()
-				mu.Lock()
-				defer container.mu.Unlock()
-				defer mu.Unlock()
-				closeConnection(conn)
-			}()
+		container.mu.Lock()
+		defer container.mu.Unlock()
+		for _, entry := range container.connections {
+			entry.close <- 0
 		}
 	}, nil
 }
@@ -228,24 +253,7 @@ func BroadcastGlobalState() {
 	message := append(buffer, '\n')
 	log.Println("Sending global state:", string(message))
 
-	for conn, mu := range container.connections {
-		go func() {
-			mu.Lock()
-			defer mu.Unlock()
-
-			if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
-				fmt.Fprintf(os.Stderr, "error setting write deadline: %s\n", err)
-			}
-
-			if _, err := conn.Write(message); err != nil {
-				if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
-					container.mu.Lock()
-					defer container.mu.Unlock()
-					closeConnection(conn)
-				} else {
-					fmt.Fprintf(os.Stderr, "error writing global state to connection: %s\n", err)
-				}
-			}
-		}()
+	for _, entry := range container.connections {
+		entry.write <- message
 	}
 }
