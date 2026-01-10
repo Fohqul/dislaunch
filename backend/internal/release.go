@@ -287,8 +287,8 @@ func (release *Release) GetState() *ReleaseState {
 		return nil
 	}
 
-	if value := release.state.Load(); value != nil {
-		return value.(*ReleaseState)
+	if state, ok := release.state.Load().(*ReleaseState); ok {
+		return state
 	}
 
 	return nil
