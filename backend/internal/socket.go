@@ -111,7 +111,7 @@ func handleConnection(conn net.Conn) {
 			continue
 		}
 		log.Println("Connection received:", data)
-		command := strings.Split(data[:len(data)-1], " ")
+		command := strings.Fields(data)
 
 		switch command[0] {
 		case "state":
