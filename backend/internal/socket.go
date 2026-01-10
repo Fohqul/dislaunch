@@ -28,6 +28,28 @@ type connectionsContainer struct {
 
 var container connectionsContainer
 
+func closeConnection(conn net.Conn) {
+	container.mu.Lock()
+	delete(container.connections, conn)
+	container.mu.Unlock()
+
+	if err := conn.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "error closing connection: %w\n", err)
+	}
+}
+
+func connectionOpen(conn net.Conn) bool {
+	container.mu.Lock()
+	defer container.mu.Unlock()
+
+	if _, exists := container.connections[conn]; listener == nil || !exists {
+		closeConnection(conn)
+		return false
+	}
+
+	return true
+}
+
 func releaseCommand(release *Release, command []string) {
 	switch command[1] {
 	case "bd":
@@ -80,25 +102,15 @@ func handleConnection(conn net.Conn) {
 
 	reader := bufio.NewReader(conn)
 
-	for {
-		container.mu.Lock()
-		if _, exists := container.connections[conn]; !exists {
-			if err := conn.Close(); err != nil {
-				fmt.Fprintf(os.Stderr, "error closing connection: %w\n", err)
-			}
-			return
-		}
-		container.mu.Unlock()
-
+	for connectionOpen(conn) {
 		data, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
-				container.mu.Lock()
-				defer container.mu.Unlock()
-				delete(container.connections, conn)
-			} else {
-				fmt.Fprintf(os.Stderr, "error reading buffered I/O: %w\n", err)
+				closeConnection(conn)
+				return
 			}
+
+			fmt.Fprintf(os.Stderr, "error reading buffered I/O: %w\n", err)
 			continue
 		}
 		command := strings.Split(data, " ")
@@ -172,9 +184,6 @@ func StartListener() (func(), error) {
 	}()
 
 	return func() {
-		container.mu.Lock()
-		defer container.mu.Unlock()
-
 		if listener == nil {
 			fmt.Fprintln(os.Stderr, "error closing listener: no listener is running")
 			return
@@ -183,9 +192,14 @@ func StartListener() (func(), error) {
 		if err := listener.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "error closing listener: %w\n", err)
 		}
+		listener = nil
 
-		for conn, _ := range container.connections {
-			delete(container.connections, conn)
+		for conn, mu := range container.connections {
+			go func() {
+				mu.Lock()
+				defer mu.Unlock()
+				closeConnection(conn)
+			}()
 		}
 	}, nil
 }
@@ -198,6 +212,10 @@ type GlobalState struct {
 }
 
 func BroadcastGlobalState() {
+	if listener == nil {
+		return
+	}
+
 	container.mu.Lock()
 	defer container.mu.Unlock()
 
@@ -224,9 +242,7 @@ func BroadcastGlobalState() {
 
 			if _, err := conn.Write(message); err != nil {
 				if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
-					container.mu.Lock()
-					defer container.mu.Unlock()
-					delete(container.connections, conn)
+					closeConnection(conn)
 				} else {
 					fmt.Fprintf(os.Stderr, "error writing global state to connection: %w\n", err)
 				}
