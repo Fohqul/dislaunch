@@ -165,6 +165,9 @@ func StartListener() (func(), error) {
 
 	go func() {
 		for {
+			if listener == nil {
+				return
+			}
 			conn, err := listener.Accept()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error accepting connection: %s\n", err)
