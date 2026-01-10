@@ -254,7 +254,7 @@ type ReleaseState struct {
 }
 
 func (release *Release) updateState() {
-	var state *ReleaseState
+	state := &ReleaseState{}
 
 	if internal, err := release.getInternal(); err != nil {
 		state.Internal = nil
@@ -295,7 +295,7 @@ func (release *Release) CheckForUpdates() {
 		return
 	}
 
-	internal, err := release.getInternal()
+	_, err := release.getInternal()
 	if err != nil {
 		return
 	}
@@ -308,12 +308,12 @@ func (release *Release) CheckForUpdates() {
 	release.progress = 101
 	release.updateState()
 
-	url := "https://discord.com/api/" + release.String() + "/updates?platform=linux"
+	// url := "https://discord.com/api/" + release.String() + "/updates?platform=linux"
 	// TODO
 }
 
 func (release *Release) Install() {
-	internal, err := release.getInternal()
+	_, err := release.getInternal()
 	if release.isInstalled() && err != nil {
 		return
 	}
@@ -332,7 +332,7 @@ func (release *Release) InjectBetterDiscord(channel BetterDiscordChannel) {
 		return
 	}
 
-	internal, err := release.getInternal()
+	_, err := release.getInternal()
 	if err != nil {
 		return
 	}
@@ -364,7 +364,7 @@ func (release *Release) Move(path string) {
 	}
 
 	// TODO handle cross-device moves
-	fmt.Fprintf(os.Stderr, "error moving release '%s' to '%s': %w\n", release, path, err)
+	fmt.Fprintf(os.Stderr, "error moving release '%s' to '%s': %s\n", release, path, err)
 }
 
 func (release *Release) Uninstall() {
@@ -387,12 +387,12 @@ func (release *Release) Uninstall() {
 	// Scary!
 	// todo perhaps consider some safeguards to prevent deleting critical directories?
 	if err = os.RemoveAll(internal.InstallPath); err != nil {
-		fmt.Fprintf(os.Stderr, "error uninstalling release '%s' from '%s': %w\n", release, internal.InstallPath, err)
+		fmt.Fprintf(os.Stderr, "error uninstalling release '%s' from '%s': %s\n", release, internal.InstallPath, err)
 		release.status = Fatal
 		release.message = "Failed to uninstall"
 		release.err = err
 	} else if err = os.Remove(release.getGobPath()); err != nil {
-		fmt.Fprintf(os.Stderr, "error deleting gob for release '%s': %w\n", release, err)
+		fmt.Fprintf(os.Stderr, "error deleting gob for release '%s': %s\n", release, err)
 		release.status = Fatal
 		release.message = "Failed to delete internal data at '" + release.getGobPath() + "'"
 		release.err = err

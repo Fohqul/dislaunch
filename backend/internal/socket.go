@@ -34,7 +34,7 @@ func closeConnection(conn net.Conn) {
 	container.mu.Unlock()
 
 	if err := conn.Close(); err != nil {
-		fmt.Fprintf(os.Stderr, "error closing connection: %w\n", err)
+		fmt.Fprintf(os.Stderr, "error closing connection: %s\n", err)
 	}
 }
 
@@ -56,25 +56,19 @@ func releaseCommand(release *Release, command []string) {
 		switch command[2] {
 		case "stable":
 			go release.InjectBetterDiscord(BDStable)
-			break
 		case "canary":
 			go release.InjectBetterDiscord(BDCanary)
-			break
 		default:
 			fmt.Fprintf(os.Stderr, "unknown BetterDiscord channel: %s\n", command[2])
 		}
-		break
 	case "check_for_updates":
 		go release.CheckForUpdates()
-		break
 	case "install":
 		go release.Install()
-		break
 	case "move":
 		go release.Move(command[2])
 	case "uninstall":
 		go release.Uninstall()
-		break
 	default:
 		fmt.Fprintf(os.Stderr, "unknown argument: %s\n", command[1])
 	}
@@ -110,7 +104,7 @@ func handleConnection(conn net.Conn) {
 				return
 			}
 
-			fmt.Fprintf(os.Stderr, "error reading buffered I/O: %w\n", err)
+			fmt.Fprintf(os.Stderr, "error reading buffered I/O: %s\n", err)
 			continue
 		}
 		command := strings.Split(data, " ")
@@ -118,37 +112,28 @@ func handleConnection(conn net.Conn) {
 		switch command[0] {
 		case "state":
 			go BroadcastGlobalState()
-			break
 		case "stable":
 			go releaseCommand(&Stable, command)
-			break
 		case "ptb":
 			go releaseCommand(&PTB, command)
-			break
 		case "canary":
 			go releaseCommand(&Canary, command)
-			break
 		case "config":
 			// i should be taken out back for nesting switch statements like this. there is certainly a better way of handling commands/subcommands/arguments
 			switch command[1] {
 			case "automatically_check_for_updates":
 				setBoolean(SetAutomaticallyCheckForUpdates, command[2])
-				break
 			case "notify_on_update_available":
 				setBoolean(SetNotifyOnUpdateAvailable, command[2])
-				break
 			case "automatically_install_updates":
 				setBoolean(SetAutomaticallyInstallUpdates, command[2])
-				break
 			case "default_install_path":
 				if err = SetDefaultInstallPath(command[2]); err != nil {
-					fmt.Fprintf(os.Stderr, "error setting default installation path: %w\n", err)
+					fmt.Fprintf(os.Stderr, "error setting default installation path: %s\n", err)
 				}
-				break
 			default:
 				fmt.Fprintf(os.Stderr, "unknown configuration option: %s\n", command[1])
 			}
-			break
 		default:
 			fmt.Fprintf(os.Stderr, "unknown action: %s\n", command[0])
 		}
@@ -176,7 +161,7 @@ func StartListener() (func(), error) {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error accepting connection: %w\n", err)
+				fmt.Fprintf(os.Stderr, "error accepting connection: %s\n", err)
 				continue
 			}
 			go handleConnection(conn)
@@ -190,7 +175,7 @@ func StartListener() (func(), error) {
 		}
 
 		if err := listener.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "error closing listener: %w\n", err)
+			fmt.Fprintf(os.Stderr, "error closing listener: %s\n", err)
 		}
 		listener = nil
 
@@ -226,7 +211,7 @@ func BroadcastGlobalState() {
 		Configuration: GetConfiguration(),
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error marshalling global state to JSON: %w\n", err)
+		fmt.Fprintf(os.Stderr, "error marshalling global state to JSON: %s\n", err)
 		return
 	}
 	message := append(buffer, '\n')
@@ -237,14 +222,14 @@ func BroadcastGlobalState() {
 			defer mu.Unlock()
 
 			if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
-				fmt.Fprintf(os.Stderr, "error setting write deadline: %w\n", err)
+				fmt.Fprintf(os.Stderr, "error setting write deadline: %s\n", err)
 			}
 
 			if _, err := conn.Write(message); err != nil {
 				if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
 					closeConnection(conn)
 				} else {
-					fmt.Fprintf(os.Stderr, "error writing global state to connection: %w\n", err)
+					fmt.Fprintf(os.Stderr, "error writing global state to connection: %s\n", err)
 				}
 			}
 		}()

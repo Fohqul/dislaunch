@@ -21,7 +21,7 @@ type Configuration struct {
 func openConfigurationFile() (*os.File, func()) {
 	configurationDirectory, err := os.UserConfigDir()
 	if err != nil {
-		log.Fatalf("error getting configuration directory: %w\n", err)
+		log.Fatalf("error getting configuration directory: %s\n", err)
 	}
 
 	path := filepath.Join(configurationDirectory, "io.github.Fohqul.Dislaunch.json")
@@ -29,7 +29,7 @@ func openConfigurationFile() (*os.File, func()) {
 
 	configurationFile, err := os.Open(path)
 	if err != nil {
-		log.Fatalf("error opening configuration file: %w\n", err)
+		log.Fatalf("error opening configuration file: %s\n", err)
 	}
 	return configurationFile, func() {
 		configurationFile.Close()
@@ -44,7 +44,7 @@ func assertWritePermissions(path string) error {
 	}
 	file.Close()
 	if err = os.Remove(file.Name()); err != nil {
-		fmt.Fprintf(os.Stderr, "error deleting temporary file '%s': %w\n", file.Name(), err)
+		fmt.Fprintf(os.Stderr, "error deleting temporary file '%s': %s\n", file.Name(), err)
 	}
 	return nil
 }
@@ -55,11 +55,11 @@ func GetConfiguration() Configuration {
 
 	var configuration Configuration
 	if err := json.NewDecoder(configurationFile).Decode(&configuration); err != nil {
-		fmt.Fprintf(os.Stderr, "error decoding configuration: %w\n", err)
+		fmt.Fprintf(os.Stderr, "error decoding configuration: %s\n", err)
 	}
 
 	if err := assertWritePermissions(configuration.DefaultInstallPath); err != nil {
-		fmt.Fprintf(os.Stderr, "error writing to configured install location '%s': %w\n", configuration.DefaultInstallPath, err)
+		fmt.Fprintf(os.Stderr, "error writing to configured install location '%s': %s\n", configuration.DefaultInstallPath, err)
 		configuration.DefaultInstallPath = GetHomeXDGDirectory("XDG_DATA_HOME", filepath.Join(".local", "share"))
 	}
 	return configuration
