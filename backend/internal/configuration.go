@@ -2,7 +2,9 @@ package dislaunch
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -18,7 +20,7 @@ type Configuration struct {
 	DefaultInstallPath           string `json:"default_install_path"`
 }
 
-func openConfigurationFile() (*os.File, func()) {
+func openConfigurationFile(flag int) (*os.File, func()) {
 	configurationDirectory, err := os.UserConfigDir()
 	if err != nil {
 		log.Fatalf("error getting configuration directory: %s\n", err)
@@ -27,7 +29,7 @@ func openConfigurationFile() (*os.File, func()) {
 	path := filepath.Join(configurationDirectory, "io.github.Fohqul.Dislaunch.json")
 	lock := flock.New(path)
 
-	configurationFile, err := os.Open(path)
+	configurationFile, err := os.OpenFile(path, os.O_CREATE|flag, 0600)
 	if err != nil {
 		log.Fatalf("error opening configuration file: %s\n", err)
 	}
@@ -50,11 +52,11 @@ func assertWritePermissions(path string) error {
 }
 
 func GetConfiguration() Configuration {
-	configurationFile, close := openConfigurationFile()
+	configurationFile, close := openConfigurationFile(os.O_RDONLY)
 	defer close()
 
 	var configuration Configuration
-	if err := json.NewDecoder(configurationFile).Decode(&configuration); err != nil {
+	if err := json.NewDecoder(configurationFile).Decode(&configuration); err != nil && !errors.Is(err, io.EOF) {
 		fmt.Fprintf(os.Stderr, "error decoding configuration: %s\n", err)
 	}
 
@@ -66,10 +68,11 @@ func GetConfiguration() Configuration {
 }
 
 func setConfiguration(configuration Configuration) error {
-	configurationFile, close := openConfigurationFile()
+	configurationFile, close := openConfigurationFile(os.O_WRONLY)
 	defer close()
 
 	if err := json.NewEncoder(configurationFile).Encode(configuration); err != nil {
+		fmt.Fprintf(os.Stderr, "error encoding configuration: %s\n", err)
 		return err // todo should this be fatal?
 	}
 
