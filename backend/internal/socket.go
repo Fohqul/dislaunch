@@ -237,9 +237,6 @@ func BroadcastGlobalState() {
 		return
 	}
 
-	container.mu.Lock()
-	defer container.mu.Unlock()
-
 	buffer, err := json.Marshal(GlobalState{
 		Stable:        Stable.GetState(),
 		PTB:           PTB.GetState(),
@@ -253,6 +250,8 @@ func BroadcastGlobalState() {
 	message := append(buffer, '\n')
 	log.Println("Sending global state:", string(message))
 
+	container.mu.Lock()
+	defer container.mu.Unlock()
 	for _, entry := range container.connections {
 		entry.write <- message
 	}
