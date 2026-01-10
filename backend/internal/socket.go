@@ -67,11 +67,12 @@ func releaseCommand(release *Release, command []string) {
 }
 
 func setBoolean(set func(bool), setting string) {
-	if setting == "0" {
+	switch setting {
+	case "0":
 		set(false)
-	} else if setting == "1" {
+	case "1":
 		set(true)
-	} else {
+	default:
 		fmt.Fprintf(os.Stderr, "invalid boolean setting: %s\n", setting)
 	}
 }
