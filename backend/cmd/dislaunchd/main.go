@@ -26,16 +26,15 @@ func main() {
 	} else if !locked {
 		log.Fatalf("error locking at '%s'\nIs another instance of Dislaunch already running?\n", lockfilePath)
 	}
+	defer unlock(lockfile)
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	close, err := dislaunch.StartListener()
 	if err != nil {
-		unlock(lockfile)
 		log.Fatalf("error starting listener: %s\n", err)
 	}
+	defer close()
 
 	<-signals
-	close()
-	unlock(lockfile)
 }
