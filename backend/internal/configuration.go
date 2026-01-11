@@ -28,6 +28,9 @@ func openConfigurationFile(flag int) (*os.File, func()) {
 
 	path := filepath.Join(configurationDirectory, "io.github.Fohqul.Dislaunch.json")
 	lock := flock.New(path)
+	if err = lock.Lock(); err != nil {
+		log.Fatalf("error locking configuration file: %s\n", err)
+	}
 
 	configurationFile, err := os.OpenFile(path, os.O_CREATE|flag, 0600)
 	if err != nil {
