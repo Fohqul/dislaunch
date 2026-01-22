@@ -82,7 +82,7 @@ func (release *Release) getGobPath() string {
 
 func (release *Release) isInstalled() bool {
 	_, err := os.Stat(release.getGobPath())
-	if err != nil {
+	if err == nil {
 		return true
 	}
 	if errors.Is(err, os.ErrNotExist) {
