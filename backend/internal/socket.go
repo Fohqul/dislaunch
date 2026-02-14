@@ -35,11 +35,8 @@ func connectionOpen(conn net.Conn) bool {
 	container.mu.Lock()
 	defer container.mu.Unlock()
 
-	if _, exists := container.connections[conn]; listener == nil || !exists {
-		return false
-	}
-
-	return true
+	_, exists := container.connections[conn]
+	return listener != nil && exists
 }
 
 func releaseCommand(release *Release, command []string) {
