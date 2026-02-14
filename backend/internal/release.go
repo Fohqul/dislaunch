@@ -187,7 +187,16 @@ func (release *Release) SetBetterDiscordEnabled(betterDiscordEnabled bool) error
 	}
 
 	internal.BetterDiscordEnabled = betterDiscordEnabled
-	return release.setInternal(internal)
+	if err = release.setInternal(internal); err != nil {
+		return err
+	}
+
+	if betterDiscordEnabled {
+		go release.injectBetterDiscord()
+	} else {
+		go release.uninjectBetterDiscord()
+	}
+	return nil
 }
 
 func (release *Release) SetBetterDiscordChannel(betterDiscordChannel BetterDiscordChannel) error {
@@ -197,7 +206,12 @@ func (release *Release) SetBetterDiscordChannel(betterDiscordChannel BetterDisco
 	}
 
 	internal.BetterDiscordChannel = betterDiscordChannel
-	return release.setInternal(internal)
+	if err = release.setInternal(internal); err != nil {
+		return err
+	}
+
+	go release.injectBetterDiscord()
+	return nil
 }
 
 /**
@@ -294,14 +308,14 @@ func (release *Release) GetState() *ReleaseState {
 	return nil
 }
 
-func (release *Release) CheckForUpdates() {
+func (release *Release) CheckForUpdates() bool {
 	if release.status == Fatal {
-		return
+		return false
 	}
 
 	_, err := release.getInternal()
 	if err != nil {
-		return
+		return false
 	}
 
 	release.mu.Lock()
@@ -314,6 +328,7 @@ func (release *Release) CheckForUpdates() {
 
 	// url := "https://discord.com/api/" + release.String() + "/updates?platform=linux"
 	// TODO
+	return false
 }
 
 func (release *Release) Install() {
@@ -331,7 +346,23 @@ func (release *Release) Install() {
 	// TODO
 }
 
-func (release *Release) InjectBetterDiscord(channel BetterDiscordChannel) {
+func (release *Release) uninjectBetterDiscord() {
+	if release.status == Fatal {
+		return
+	}
+
+	_, err := release.getInternal()
+	if err != nil {
+		return
+	}
+
+	release.mu.Lock()
+	defer release.mu.Unlock()
+
+	// TODO
+}
+
+func (release *Release) injectBetterDiscord() {
 	if release.status == Fatal {
 		return
 	}

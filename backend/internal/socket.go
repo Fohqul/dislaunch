@@ -41,12 +41,22 @@ func connectionOpen(conn net.Conn) bool {
 
 func releaseCommand(release *Release, command []string) {
 	switch command[1] {
-	case "bd":
+	case "bd_enabled":
+		setBoolean(func(enabled bool) {
+			if err := release.SetBetterDiscordEnabled(enabled); err != nil {
+				fmt.Fprintf(os.Stderr, "failed to set BetterDiscord enabled: %s\n", err)
+			}
+		}, command[2])
+	case "bd_channel":
 		switch command[2] {
 		case "stable":
-			go release.InjectBetterDiscord(BDStable)
+			if err := release.SetBetterDiscordChannel(BDStable); err != nil {
+				fmt.Fprintf(os.Stderr, "failed to set BetterDiscord channel: %s\n", err)
+			}
 		case "canary":
-			go release.InjectBetterDiscord(BDCanary)
+			if err := release.SetBetterDiscordChannel(BDCanary); err != nil {
+				fmt.Fprintf(os.Stderr, "failed to set BetterDiscord channel: %s\n", err)
+			}
 		default:
 			fmt.Fprintf(os.Stderr, "unknown BetterDiscord channel: %s\n", command[2])
 		}
@@ -111,6 +121,7 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 			case "default_install_path":
 				if err = SetDefaultInstallPath(command[2]); err != nil {
 					fmt.Fprintf(os.Stderr, "error setting default installation path: %s\n", err)
+					BroadcastGlobalState() // if `SetDefaultInstallPath` fails, `setConfiguration` never runs and therefore `BroadcastGlobalState` never runs
 				}
 			default:
 				fmt.Fprintf(os.Stderr, "unknown configuration option: %s\n", command[1])
@@ -203,6 +214,8 @@ func StartListener() (func(), error) {
 			go handleConnection(conn)
 		}
 	}()
+
+	go StartIntervals()
 
 	return func() {
 		if listener == nil {

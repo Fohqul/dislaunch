@@ -1,16 +1,28 @@
 package main
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
+	"sync"
 	"syscall"
+	"time"
 
 	dislaunch "github.com/Fohqul/dislaunch/internal"
 	"github.com/gofrs/flock"
 )
+
+const STARTED = "DAEMON STARTED"
+
+func usage() {
+	fmt.Printf("Usage: %s [command]\n\tpath\tGet path of running socket and start one if none is running\n\tstart\tStart the daemon\n", os.Args[0])
+}
 
 func unlock(lockfile *flock.Flock) {
 	if err := lockfile.Unlock(); err != nil {
@@ -19,22 +31,88 @@ func unlock(lockfile *flock.Flock) {
 }
 
 func main() {
+	if len(os.Args) == 1 {
+		usage()
+		return
+	}
+
 	lockfilePath := filepath.Join(dislaunch.GetRuntimeDirectory(), "dislaunch.sock")
 	lockfile := flock.New(lockfilePath)
-	if locked, err := lockfile.TryLock(); err != nil {
-		log.Fatalf("error locking at '%s': %s\nIs another instance of Dislaunch already running?\n", lockfilePath, err)
-	} else if !locked {
-		log.Fatalf("error locking at '%s'\nIs another instance of Dislaunch already running?\n", lockfilePath)
-	}
-	defer unlock(lockfile)
 
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-	close, err := dislaunch.StartListener()
-	if err != nil {
-		log.Fatalf("error starting listener: %s\n", err)
-	}
-	defer close()
+	switch os.Args[1] {
+	case "path":
+		locked, err := lockfile.TryLock()
+		if err != nil && !errors.Is(err, syscall.ENXIO) {
+			log.Fatalf("error trying to lock at '%s': %s\n", lockfilePath, err)
+		}
+		if !locked {
+			fmt.Print(lockfilePath)
+			return
+		}
 
-	<-signals
+		cmd := exec.Command(os.Args[0], "start")
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setsid: true,
+		}
+
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			log.Fatalf("error getting standard output pipe to daemon command: %s\n", err)
+		}
+
+		var wg sync.WaitGroup
+		started := make(chan byte)
+		wg.Go(func() {
+			reader := bufio.NewReader(stdout)
+			for {
+				line, _, err := reader.ReadLine()
+				if string(line) == STARTED {
+					started <- 0
+					return
+				}
+				if err != nil {
+					log.Fatalf("error reading from daemon standard output: %s\n", err)
+				}
+			}
+		})
+
+		timer := time.NewTimer(5 * time.Second)
+		wg.Go(func() {
+			select {
+			case <-timer.C:
+				log.Fatal("daemon timed out")
+			case <-started:
+				fmt.Print(lockfilePath)
+				os.Exit(0)
+			}
+		})
+
+		unlock(lockfile)
+		if err = cmd.Start(); err != nil {
+			log.Fatalf("error starting daemon process: %s\n", err)
+		}
+		wg.Wait()
+	case "start":
+		if locked, err := lockfile.TryLock(); err != nil {
+			log.Fatalf("error locking at '%s': %s\nIs another instance of Dislaunch already running?\n", lockfilePath, err)
+		} else if !locked {
+			log.Fatalf("error locking at '%s'\nIs another instance of Dislaunch already running?\n", lockfilePath)
+		}
+		defer unlock(lockfile)
+
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+		close, err := dislaunch.StartListener()
+		if err != nil {
+			log.Fatalf("error starting listener: %s\n", err)
+		}
+		defer close()
+		fmt.Printf("\n%s\n", STARTED) // surround with newlines so it's guaranteed to be picked up as a single line
+
+		<-signals
+	default:
+		fmt.Fprintf(os.Stderr, "invalid arguments: %s\n", strings.Join(os.Args[1:], " "))
+		usage()
+		os.Exit(1)
+	}
 }
