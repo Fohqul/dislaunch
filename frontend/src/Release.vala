@@ -6,6 +6,7 @@ class Release : Gtk.Box {
 	private Gtk.Button update_button;
 	private FolderEntryRow install_path_row;
 	private ProgressRow install_path_progress_row;
+	private Adw.EntryRow command_line_arguments_row;
 	private ProgressRow uninstall_progress_row;
 	private Gtk.StringList bd_channels;
 	private Adw.ExpanderRow bd_enabled_row;
@@ -39,6 +40,10 @@ class Release : Gtk.Box {
 		install_path_row = new FolderEntryRow (application_window, File.new_build_filename (Environment.get_user_state_dir (), "io.github.Fohqul.Dislaunch"), (path) => Socket.command ("%s move %s".printf (channel.id, path))) { title = "Install Path" };
 		install_path_progress_row = new ProgressRow (install_path_row);
 		main_preferences_group.add (install_path_progress_row);
+
+		command_line_arguments_row = new Adw.EntryRow () { title = "Command-Line Arguments" };
+		command_line_arguments_row.changed.connect ((row) => Socket.command ("%s command_line_arguments %s".printf (channel.id, row.text)));
+		main_preferences_group.add (command_line_arguments_row);
 
 		var uninstall_row = new Adw.ActionRow ();
 
@@ -145,6 +150,7 @@ class Release : Gtk.Box {
 		}
 		update_row.subtitle = state.internal.last_checked != "0001-01-01T00:00:00Z" ? new DateTime.from_iso8601 (state.internal.last_checked, null).format ("Last checked: %Y-%m-%d %H:%M:%S") : "";
 		install_path_row.text = state.internal.install_path;
+		command_line_arguments_row.text = state.internal.command_line_arguments;
 
 		bd_enabled_row.expanded = state.internal.bd_enabled;
 		bd_enabled_switch.state = state.internal.bd_enabled;

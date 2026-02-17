@@ -7,6 +7,7 @@ public struct ReleaseInternal {
 	string install_path;
 	string last_checked;
 	string latest_version;
+	string command_line_arguments;
 	bool bd_enabled;
 	string bd_channel;
 }
@@ -186,6 +187,7 @@ class Socket {
 			state.internal.install_path = parse_value (internal_object.get_member ("install_path"), Type.STRING).get_string ();
 			state.internal.last_checked = parse_value (internal_object.get_member ("last_checked"), Type.STRING).get_string ();
 			state.internal.latest_version = parse_value (internal_object.get_member ("latest_version"), Type.STRING).get_string ();
+			state.internal.command_line_arguments = parse_value (internal_object.get_member ("command_line_arguments"), Type.STRING).get_string ();
 			state.internal.bd_enabled = parse_value (internal_object.get_member ("bd_enabled"), Type.BOOLEAN).get_boolean ();
 			state.internal.bd_channel = parse_value (internal_object.get_member ("bd_channel"), Type.STRING).get_string ();
 			// } catch (Error e) {

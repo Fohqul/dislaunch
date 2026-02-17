@@ -39,7 +39,7 @@ func connectionOpen(conn net.Conn) bool {
 	return listener != nil && exists
 }
 
-func releaseCommand(release *Release, command []string) {
+func releaseCommand(release *Release, data string, command []string) {
 	switch command[1] {
 	case "bd_enabled":
 		setBoolean(func(enabled bool) {
@@ -62,6 +62,9 @@ func releaseCommand(release *Release, command []string) {
 		}
 	case "check_for_updates":
 		go release.CheckForUpdates()
+	case "command_line_arguments":
+		// Use a slice directly from `data` so the raw arguments are kept as-is and not lost from `string.Fields`
+		go release.SetCommandLineArguments(data[len(release.String()+" command_line_arguments "):])
 	case "install":
 		go release.Install()
 	case "move":
@@ -104,11 +107,11 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 		case "state":
 			go BroadcastGlobalState()
 		case "stable":
-			go releaseCommand(&Stable, command)
+			go releaseCommand(&Stable, data, command)
 		case "ptb":
-			go releaseCommand(&PTB, command)
+			go releaseCommand(&PTB, data, command)
 		case "canary":
-			go releaseCommand(&Canary, command)
+			go releaseCommand(&Canary, data, command)
 		case "config":
 			// i should be taken out back for nesting switch statements like this. there is certainly a better way of handling commands/subcommands/arguments
 			switch command[1] {

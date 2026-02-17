@@ -58,6 +58,7 @@ type releaseInternal struct {
 	InstallPath          string               `json:"install_path"`
 	LastChecked          time.Time            `json:"last_checked"`
 	LatestVersion        string               `json:"latest_version"`
+	CommandLineArguments string               `json:"command_line_arguments"`
 	BetterDiscordEnabled bool                 `json:"bd_enabled"`
 	BetterDiscordChannel BetterDiscordChannel `json:"bd_channel"`
 }
@@ -177,6 +178,16 @@ func (release *Release) setLastChecked(lastChecked time.Time) error {
 	}
 
 	internal.LastChecked = lastChecked
+	return release.setInternal(internal)
+}
+
+func (release *Release) SetCommandLineArguments(commandLineArguments string) error {
+	internal, err := release.getInternal()
+	if err != nil {
+		return err
+	}
+
+	internal.CommandLineArguments = commandLineArguments
 	return release.setInternal(internal)
 }
 
