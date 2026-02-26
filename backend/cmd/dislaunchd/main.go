@@ -68,13 +68,11 @@ func main() {
 		wg.Go(func() {
 			reader := bufio.NewReader(stdout)
 			for {
-				line, _, err := reader.ReadLine()
-				if string(line) == STARTED {
+				if line, _, err := reader.ReadLine(); err != nil {
+					log.Fatalf("error reading from daemon standard output: %s\n", err)
+				} else if string(line) == STARTED {
 					started <- 0
 					return
-				}
-				if err != nil {
-					log.Fatalf("error reading from daemon standard output: %s\n", err)
 				}
 			}
 		})
