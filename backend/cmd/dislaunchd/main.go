@@ -21,7 +21,10 @@ import (
 const STARTED = "DAEMON STARTED"
 
 func usage() {
-	fmt.Printf("Usage: %s [command]\n\tpath\tGet path of running socket and start one if none is running\n\tstart\tStart the daemon\n", os.Args[0])
+	fmt.Printf("Usage: %s [command]\n", os.Args[0])
+	fmt.Println("\tpath\tGet path of running socket and start one if none is running")
+	fmt.Println("\tstart\tStart the daemon")
+	fmt.Printf("\t\t-p\tPrint \"%s\" when the daemon successfully starts\n", STARTED)
 }
 
 func unlock(lockfile *flock.Flock) {
@@ -50,7 +53,7 @@ func main() {
 			return
 		}
 
-		cmd := exec.Command(os.Args[0], "start")
+		cmd := exec.Command(os.Args[0], "start", "-p")
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			Setsid: true,
 		}
@@ -107,7 +110,10 @@ func main() {
 			log.Fatalf("error starting listener: %s\n", err)
 		}
 		defer close()
-		fmt.Printf("\n%s\n", STARTED) // surround with newlines so it's guaranteed to be picked up as a single line
+
+		if os.Args[2] == "-p" {
+			fmt.Printf("\n%s\n", STARTED) // surround with newlines so it's guaranteed to be picked up as a single line
+		}
 
 		<-signals
 	default:
