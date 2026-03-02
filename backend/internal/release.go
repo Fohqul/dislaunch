@@ -182,6 +182,9 @@ func (release *Release) setLastChecked(lastChecked time.Time) error {
 }
 
 func (release *Release) SetCommandLineArguments(commandLineArguments string) error {
+	release.mu.Lock()
+	defer release.mu.Unlock()
+
 	internal, err := release.getInternal()
 	if err != nil {
 		return err
@@ -192,6 +195,9 @@ func (release *Release) SetCommandLineArguments(commandLineArguments string) err
 }
 
 func (release *Release) SetBetterDiscordEnabled(betterDiscordEnabled bool) error {
+	release.mu.Lock()
+	defer release.mu.Unlock()
+
 	internal, err := release.getInternal()
 	if err != nil {
 		return err
@@ -211,6 +217,9 @@ func (release *Release) SetBetterDiscordEnabled(betterDiscordEnabled bool) error
 }
 
 func (release *Release) SetBetterDiscordChannel(betterDiscordChannel BetterDiscordChannel) error {
+	release.mu.Lock()
+	defer release.mu.Unlock()
+
 	internal, err := release.getInternal()
 	if err != nil {
 		return err
@@ -320,6 +329,9 @@ func (release *Release) GetState() *ReleaseState {
 }
 
 func (release *Release) CheckForUpdates() bool {
+	release.mu.Lock()
+	defer release.mu.Unlock()
+
 	if release.status == Fatal {
 		return false
 	}
@@ -328,9 +340,6 @@ func (release *Release) CheckForUpdates() bool {
 	if err != nil {
 		return false
 	}
-
-	release.mu.Lock()
-	defer release.mu.Unlock()
 
 	release.status = UpdateCheck
 	release.message = "Checking for updates"
@@ -343,6 +352,9 @@ func (release *Release) CheckForUpdates() bool {
 }
 
 func (release *Release) Install() {
+	release.mu.Lock()
+	defer release.mu.Unlock()
+
 	_, err := release.getInternal()
 	if release.isInstalled() && err != nil {
 		return
@@ -351,13 +363,14 @@ func (release *Release) Install() {
 	if release.status == Fatal {
 		return
 	}
-	release.mu.Lock()
-	defer release.mu.Unlock()
 
 	// TODO
 }
 
 func (release *Release) uninjectBetterDiscord() {
+	release.mu.Lock()
+	defer release.mu.Unlock()
+
 	if release.status == Fatal {
 		return
 	}
@@ -366,14 +379,14 @@ func (release *Release) uninjectBetterDiscord() {
 	if err != nil {
 		return
 	}
-
-	release.mu.Lock()
-	defer release.mu.Unlock()
 
 	// TODO
 }
 
 func (release *Release) injectBetterDiscord() {
+	release.mu.Lock()
+	defer release.mu.Unlock()
+
 	if release.status == Fatal {
 		return
 	}
@@ -383,13 +396,13 @@ func (release *Release) injectBetterDiscord() {
 		return
 	}
 
-	release.mu.Lock()
-	defer release.mu.Unlock()
-
 	// TODO
 }
 
 func (release *Release) Move(path string) {
+	release.mu.Lock()
+	defer release.mu.Unlock()
+
 	if release.status == Fatal {
 		return
 	}
@@ -398,9 +411,6 @@ func (release *Release) Move(path string) {
 	if err != nil {
 		return
 	}
-
-	release.mu.Lock()
-	defer release.mu.Unlock()
 
 	err = os.Rename(internal.InstallPath, path)
 	if err == nil {
@@ -414,6 +424,9 @@ func (release *Release) Move(path string) {
 }
 
 func (release *Release) Uninstall() {
+	release.mu.Lock()
+	defer release.mu.Unlock()
+
 	if release.status == Fatal {
 		return
 	}
@@ -423,8 +436,6 @@ func (release *Release) Uninstall() {
 		return
 	}
 
-	release.mu.Lock()
-	defer release.mu.Unlock()
 	release.status = Uninstall
 	release.message = "Deleting " + internal.InstallPath
 	release.progress = 101
