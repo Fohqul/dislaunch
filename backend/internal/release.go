@@ -18,13 +18,7 @@ import (
 	"github.com/gofrs/flock"
 )
 
-func download(source string, destination string, progress func(progress uint8)) error {
-	file, err := os.OpenFile(destination, os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		return fmt.Errorf("error opening destination '%s' for writing: %w", destination, err)
-	}
-	defer file.Close()
-
+func download(source string, destination io.Writer, progress func(progress uint8)) error {
 	response, err := http.Get(source)
 	if err != nil {
 		return fmt.Errorf("error downloading from '%s': %w", source, err)
@@ -32,24 +26,29 @@ func download(source string, destination string, progress func(progress uint8)) 
 	defer response.Body.Close()
 
 	buffer := make([]byte, 32*1024)
-	n, err := response.Body.Read(buffer)
-	accumulated := n
-	for n > 0 {
-		if response.ContentLength >= 0 {
-			progress(uint8(float64(accumulated) / float64(response.ContentLength) * 100))
-		} else {
-			progress(101)
+	accumulated := 0
+	for {
+		n, err := response.Body.Read(buffer)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+
+			return fmt.Errorf("error reading response body: %w", err)
+		}
+		accumulated += n
+
+		if progress != nil {
+			if response.ContentLength >= 0 {
+				progress(uint8(float64(accumulated) / float64(response.ContentLength) * 100))
+			} else {
+				progress(101)
+			}
 		}
 
-		if _, err := file.Write(buffer[:n]); err != nil {
+		if _, err := destination.Write(buffer[:n]); err != nil {
 			return fmt.Errorf("error writing to destination '%s': %w", destination, err)
 		}
-
-		n, err = response.Body.Read(buffer)
-		accumulated += n
-	}
-	if err != io.EOF {
-		return fmt.Errorf("error reading response body: %w", err)
 	}
 
 	return nil
