@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -17,7 +19,38 @@ import (
 )
 
 func download(source string, destination string, progress func(progress uint8)) error {
-	// TODO
+	file, err := os.OpenFile(destination, os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return fmt.Errorf("error opening destination '%s' for writing: %w", destination, err)
+	}
+	defer file.Close()
+
+	response, err := http.Get(source)
+	if err != nil {
+		return fmt.Errorf("error downloading from '%s': %w", source, err)
+	}
+	defer response.Body.Close()
+
+	buffer := make([]byte, 32*1024)
+	n, err := response.Body.Read(buffer)
+	accumulated := n
+	for n > 0 {
+		if response.ContentLength >= 0 {
+			progress(uint8(float64(accumulated) / float64(response.ContentLength) * 100))
+		} else {
+			progress(101)
+		}
+
+		if _, err := file.Write(buffer[:n]); err != nil {
+			return fmt.Errorf("error writing to destination '%s': %w", destination, err)
+		}
+
+		n, err = response.Body.Read(buffer)
+		accumulated += n
+	}
+	if err != io.EOF {
+		return fmt.Errorf("error reading response body: %w", err)
+	}
 
 	return nil
 }
