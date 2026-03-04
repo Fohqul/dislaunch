@@ -195,8 +195,6 @@ func (release *Release) getInternal() (releaseInternal, error) {
 
 	var internal releaseInternal
 	if err := gob.NewDecoder(file).Decode(&internal); err != nil {
-		release.mu.Lock()
-		defer release.mu.Unlock()
 		release.status = Fatal
 		release.message = "Failed to decode internal data"
 		release.err = err
