@@ -2,7 +2,6 @@ package dislaunch
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -59,7 +58,7 @@ func GetConfiguration() Configuration {
 	defer close()
 
 	var configuration Configuration
-	if err := json.NewDecoder(configurationFile).Decode(&configuration); err != nil && !errors.Is(err, io.EOF) {
+	if err := json.NewDecoder(configurationFile).Decode(&configuration); err != nil && err != io.EOF {
 		fmt.Fprintf(os.Stderr, "error decoding configuration: %s\n", err)
 	}
 
