@@ -13,9 +13,11 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/gofrs/flock"
+	cp "github.com/otiai10/copy"
 )
 
 func download(source string, destination io.Writer, progress func(progress uint8)) error {
@@ -449,9 +451,18 @@ func (release *Release) Move(path string) {
 		internal.InstallPath = path
 		release.setInternal(internal)
 		return
+	} else if err.(*os.LinkError).Err.(syscall.Errno) == syscall.EXDEV {
+		if err = cp.Copy(internal.InstallPath, path, cp.Options{Sync: true, PreserveTimes: true, PreserveOwner: true}); err == nil {
+			if err = os.RemoveAll(internal.InstallPath); err != nil {
+				fmt.Fprintf(os.Stderr, "error removing previous install path '%s': %s\n", internal.InstallPath, err)
+			}
+
+			internal.InstallPath = path
+			release.setInternal(internal)
+			return
+		}
 	}
 
-	// TODO handle cross-device moves
 	fmt.Fprintf(os.Stderr, "error moving release '%s' to '%s': %s\n", release, path, err)
 }
 
