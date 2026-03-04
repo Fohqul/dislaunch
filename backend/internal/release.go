@@ -1,6 +1,7 @@
 package dislaunch
 
 import (
+	"bytes"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -18,6 +20,7 @@ import (
 
 	"github.com/gofrs/flock"
 	cp "github.com/otiai10/copy"
+	"github.com/shirou/gopsutil/process"
 )
 
 func download(source string, destination io.Writer, progress func(progress uint8)) error {
@@ -203,16 +206,6 @@ func (release *Release) getInternal() (releaseInternal, error) {
 	return internal, nil
 }
 
-func (release *Release) setLastChecked(lastChecked time.Time) error {
-	internal, err := release.getInternal()
-	if err != nil {
-		return err
-	}
-
-	internal.LastChecked = lastChecked
-	return release.setInternal(internal)
-}
-
 func (release *Release) SetCommandLineArguments(commandLineArguments string) error {
 	release.mu.Lock()
 	defer release.mu.Unlock()
@@ -358,17 +351,22 @@ func (release *Release) GetState() *ReleaseState {
 	return nil
 }
 
-func (release *Release) CheckForUpdates() bool {
+type latestVersion struct {
+	Name string `json:"name"`
+	// `pub_date` isn't used
+}
+
+func (release *Release) CheckForUpdates() {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
 	if release.status == Fatal {
-		return false
+		return
 	}
 
-	_, err := release.getInternal()
+	internal, err := release.getInternal()
 	if err != nil {
-		return false
+		return
 	}
 
 	release.status = UpdateCheck
@@ -376,17 +374,33 @@ func (release *Release) CheckForUpdates() bool {
 	release.progress = 101
 	release.updateState()
 
-	// url := "https://discord.com/api/" + release.String() + "/updates?platform=linux"
-	// TODO
-	return false
+	buffer := bytes.NewBuffer(make([]byte, 1024))
+	if err := download("https://discord.com/api/"+release.String()+"/updates?platform=linux", buffer, nil); err != nil {
+		release.err = fmt.Errorf("error downloading latest version info: %w", err)
+		release.updateState()
+		return
+	}
+
+	var latestVersion latestVersion
+	if err := json.NewDecoder(buffer).Decode(&latestVersion); err != nil {
+		release.err = fmt.Errorf("error decoding latest version info: %w", err)
+		release.updateState()
+		return
+	}
+
+	internal.LatestVersion = latestVersion.Name
+	internal.LastChecked = time.Now()
+	release.setInternal(internal)
 }
 
 func (release *Release) Install() {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
-	_, err := release.getInternal()
-	if release.isInstalled() && err != nil {
+	installed := release.isInstalled()
+
+	internal, err := release.getInternal()
+	if installed && err != nil {
 		return
 	}
 
@@ -394,7 +408,85 @@ func (release *Release) Install() {
 		return
 	}
 
-	// TODO
+	version, err := release.getVersion()
+	if installed && err != nil {
+		release.err = fmt.Errorf("error getting installed version: %w", err)
+		release.updateState()
+		return
+	}
+	if version == internal.LatestVersion {
+		return
+	}
+
+	release.status = Install
+	release.updateState()
+
+	tarballPath := filepath.Join(GetHomeXDGDirectory("XDG_CACHE_HOME", ".cache"), release.String())
+	if installed {
+		tarballPath += "-" + internal.LatestVersion
+	}
+	tarballPath += ".tar.gz"
+
+	if _, err = os.Stat(tarballPath); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			release.err = fmt.Errorf("error getting stat of tarball download path: %w", err)
+			release.updateState()
+			return
+		}
+
+		downloadPath := tarballPath + ".part"
+		if err = os.Remove(downloadPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			release.err = fmt.Errorf("error deleting previous partially downloaded tarball at '%s': %w", downloadPath, err)
+			release.updateState()
+			return
+		}
+
+		file, err := os.OpenFile(downloadPath, os.O_CREATE|os.O_RDWR, 0600)
+		if err != nil {
+			release.err = fmt.Errorf("error opening tarball download path: %w", err)
+			release.updateState()
+			return
+		}
+		defer file.Close()
+
+		release.message = "Downloading version " + internal.LatestVersion
+		if err = download("https://discord.com/api/download/"+release.String()+"?platform=linux&format=tar.gz", file, func(progress uint8) {
+			release.progress = progress
+			release.updateState()
+		}); err != nil {
+			release.err = fmt.Errorf("error downloading %s %s: %w", release, internal.LatestVersion, err)
+			release.updateState()
+			return // todo handle temporary/recoverable errors
+		}
+
+		if err = os.Rename(downloadPath, tarballPath); err != nil {
+			release.err = fmt.Errorf("error renaming downloaded tarball: %w", err)
+			release.updateState()
+			return
+		}
+	}
+
+	processes, err := process.Processes()
+	if err != nil {
+		release.err = fmt.Errorf("error getting running processes: %w", err)
+		release.updateState()
+		return
+	}
+	for _, process := range processes {
+		exe, err := process.Exe()
+		if err != nil {
+			release.err = fmt.Errorf("error getting executable of running process: %w", err)
+			release.updateState()
+			return // todo should I actually return here?
+		}
+
+		if strings.HasPrefix(exe, internal.InstallPath) { // todo handle symlinks
+			log.Println("Release '", release, "' is currently running - skipping install")
+			return
+		}
+	}
+
+	// TODO extract archive, delete previous downloads
 }
 
 func (release *Release) uninjectBetterDiscord() {

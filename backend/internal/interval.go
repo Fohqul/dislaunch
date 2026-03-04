@@ -10,7 +10,9 @@ import (
 )
 
 func runInterval(configuration Configuration, release *Release) {
-	if !release.CheckForUpdates() {
+	release.CheckForUpdates()
+	state := release.GetState()
+	if state.Version == state.Internal.LatestVersion {
 		return
 	}
 
