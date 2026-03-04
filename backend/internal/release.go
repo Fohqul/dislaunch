@@ -414,7 +414,7 @@ func (release *Release) Install() {
 		release.updateState()
 		return
 	}
-	if version == internal.LatestVersion {
+	if installed && version == internal.LatestVersion {
 		return
 	}
 
