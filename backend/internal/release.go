@@ -295,8 +295,6 @@ func (release *Release) getVersion() (string, error) {
 		return "", err
 	}
 	if info.ReleaseChannel != release.String() {
-		release.mu.Lock()
-		defer release.mu.Unlock()
 		release.status = Fatal
 		release.message = "Release is installed, but it reports an unexpected release channel"
 		release.err = fmt.Errorf("mismatched release channel: %s", info.ReleaseChannel)
