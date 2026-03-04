@@ -404,7 +404,7 @@ func (release *Release) Install() {
 		return
 	}
 
-	if release.status == Fatal {
+	if installed && release.status == Fatal {
 		return
 	}
 
