@@ -131,7 +131,7 @@ func (release *Release) isInstalled() bool {
 func (release *Release) openGob() (*os.File, func()) {
 	path := release.getGobPath()
 	lock := flock.New(path)
-	// Whilst we would ideally allow `getInternal` to take a shared lock, it may be replaced with an exclusive lock by a call to `getInternal`. See https://pkg.go.dev/github.com/gofrs/flock#Flock.Lock
+	// Whilst we would ideally allow `getInternal` to take a shared lock, it may be replaced with an exclusive lock by a call to `setInternal`. See https://pkg.go.dev/github.com/gofrs/flock#Flock.Lock
 	lock.Lock()
 	file, err := os.Open(path)
 	close := func() {
