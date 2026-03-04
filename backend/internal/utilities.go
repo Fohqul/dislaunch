@@ -34,12 +34,12 @@ func GetHomeXDGDirectory(environment string, fallback string) string {
 	directory = filepath.Join(directory, "io.github.Fohqul.Dislaunch")
 	stat, err := os.Stat(directory)
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			if err := os.MkdirAll(directory, 0700); err != nil {
-				log.Fatalf("error creating XDG directory in user home '%s': %s\n", directory, err)
-			}
-		} else {
+		if !errors.Is(err, fs.ErrNotExist) {
 			log.Fatalf("error accessing XDG directory in user home '%s': %s\n", directory, err)
+		}
+
+		if err := os.MkdirAll(directory, 0700); err != nil {
+			log.Fatalf("error creating XDG directory in user home '%s': %s\n", directory, err)
 		}
 	} else if !stat.IsDir() {
 		log.Fatal("XDG path in user home is not a directory: " + directory)
