@@ -466,6 +466,12 @@ func (release *Release) Install() {
 		}
 	}
 
+	installRealpath, err := filepath.EvalSymlinks(internal.InstallPath)
+	if err != nil {
+		release.err = fmt.Errorf("error getting realpath of install path '%s': %w", internal.InstallPath, err)
+		release.updateState()
+		return
+	}
 	processes, err := process.Processes()
 	if err != nil {
 		release.err = fmt.Errorf("error getting running processes: %w", err)
@@ -477,10 +483,17 @@ func (release *Release) Install() {
 		if err != nil {
 			release.err = fmt.Errorf("error getting executable of running process: %w", err)
 			release.updateState()
-			return // todo should I actually return here?
+			continue
 		}
 
-		if strings.HasPrefix(exe, internal.InstallPath) { // todo handle symlinks
+		exeRealpath, err := filepath.EvalSymlinks(exe)
+		if err != nil {
+			release.err = fmt.Errorf("error getting realpath of executable '%s': %w", exe, err)
+			release.updateState()
+			continue
+		}
+
+		if strings.HasPrefix(exeRealpath, installRealpath) {
 			log.Println("Release '", release, "' is currently running - skipping install")
 			return
 		}
