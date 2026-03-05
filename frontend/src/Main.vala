@@ -1,6 +1,6 @@
 int launch (ReleaseChannel channel) {
 	Socket.start ();
-	ReleaseState? state = channel.to_state (Socket.get_state ().global_state);
+	ReleaseState? state = channel.to_state (Socket.get_state ().backend_state);
 
 	// if (state == null) {
 	// stderr.printf ("Release '%s' is not installed. Please install it first.\n", channel.id);

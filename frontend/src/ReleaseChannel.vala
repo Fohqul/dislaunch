@@ -31,10 +31,10 @@ class ReleaseChannel {
 		this.title = title;
 	}
 
-	public ReleaseState ? to_state(GlobalState global_state) {
-		if (this == _STABLE)return global_state.stable;
-		if (this == _PTB)return global_state.ptb;
-		if (this == _CANARY)return global_state.canary;
+	public ReleaseState ? to_state(BackendState backend_state) {
+		if (this == _STABLE)return backend_state.stable;
+		if (this == _PTB)return backend_state.ptb;
+		if (this == _CANARY)return backend_state.canary;
 		assert_not_reached();
 	}
 }

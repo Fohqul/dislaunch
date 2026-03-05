@@ -105,7 +105,7 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 
 		switch command[0] {
 		case "state":
-			go BroadcastGlobalState()
+			go BroadcastBackendState()
 		case "stable":
 			go releaseCommand(&Stable, data, command)
 		case "ptb":
@@ -124,7 +124,7 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 			case "default_install_path":
 				if err = SetDefaultInstallPath(command[2]); err != nil {
 					fmt.Fprintf(os.Stderr, "error setting default installation path: %s\n", err)
-					BroadcastGlobalState() // if `SetDefaultInstallPath` fails, `setConfiguration` never runs and therefore `BroadcastGlobalState` never runs
+					BroadcastBackendState() // if `SetDefaultInstallPath` fails, `setConfiguration` never runs and therefore `BroadcastBackendState` never runs
 				}
 			default:
 				fmt.Fprintf(os.Stderr, "unknown configuration option: %s\n", command[1])
@@ -239,30 +239,30 @@ func StartListener() (func(), error) {
 	}, nil
 }
 
-type GlobalState struct {
+type BackendState struct {
 	Stable        *ReleaseState `json:"stable"`
 	PTB           *ReleaseState `json:"ptb"`
 	Canary        *ReleaseState `json:"canary"`
 	Configuration Configuration `json:"config"`
 }
 
-func BroadcastGlobalState() {
+func BroadcastBackendState() {
 	if listener == nil {
 		return
 	}
 
-	buffer, err := json.Marshal(GlobalState{
+	buffer, err := json.Marshal(BackendState{
 		Stable:        Stable.GetState(),
 		PTB:           PTB.GetState(),
 		Canary:        Canary.GetState(),
 		Configuration: GetConfiguration(),
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error marshalling global state to JSON: %s\n", err)
+		fmt.Fprintf(os.Stderr, "error marshalling backend state to JSON: %s\n", err)
 		return
 	}
 	message := append(buffer, '\n')
-	log.Println("Sending global state:", string(message))
+	log.Println("Sending backend state:", string(message))
 
 	container.mu.Lock()
 	defer container.mu.Unlock()

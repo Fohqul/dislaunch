@@ -333,7 +333,7 @@ func (release *Release) updateState() {
 	}
 
 	release.state.Store(state)
-	BroadcastGlobalState()
+	BroadcastBackendState()
 }
 
 func (release *Release) GetState() *ReleaseState {

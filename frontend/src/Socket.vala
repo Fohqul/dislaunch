@@ -32,7 +32,7 @@ public struct Configuration {
 	string default_install_path;
 }
 
-public struct GlobalState {
+public struct BackendState {
 	ReleaseState? stable;
 	ReleaseState? ptb;
 	ReleaseState? canary;
@@ -40,7 +40,7 @@ public struct GlobalState {
 }
 
 public struct SocketState {
-	GlobalState global_state;
+	BackendState backend_state;
 	string? waiting;
 	Error error;
 	Error critical;
@@ -230,25 +230,25 @@ class Socket {
 				throw new SocketError.INVALID_RESPONSE ("invalid root type: %d", root.get_node_type ());
 
 			var root_object = root.get_object ();
-			GlobalState global_state = {};
+			BackendState backend_state = {};
 
-			parse_release (root_object.get_member ("stable"), ref global_state.stable);
-			parse_release (root_object.get_member ("ptb"), ref global_state.ptb);
-			parse_release (root_object.get_member ("canary"), ref global_state.canary);
+			parse_release (root_object.get_member ("stable"), ref backend_state.stable);
+			parse_release (root_object.get_member ("ptb"), ref backend_state.ptb);
+			parse_release (root_object.get_member ("canary"), ref backend_state.canary);
 
 			var config = root_object.get_member ("config");
 			if (config.get_node_type () != Json.NodeType.OBJECT)
 				throw new SocketError.INVALID_RESPONSE ("invalid config node type: %d", config.get_node_type ());
 
-			global_state.config = {};
+			backend_state.config = {};
 			var config_object = config.get_object ();
-			global_state.config.automatically_check_for_updates = parse_value (config_object.get_member ("automatically_check_for_updates"), Type.BOOLEAN).get_boolean ();
-			global_state.config.notify_on_update_available = parse_value (config_object.get_member ("notify_on_update_available"), Type.BOOLEAN).get_boolean ();
-			global_state.config.automatically_install_updates = parse_value (config_object.get_member ("automatically_install_updates"), Type.BOOLEAN).get_boolean ();
-			global_state.config.default_install_path = parse_value (config_object.get_member ("default_install_path"), Type.STRING).get_string ();
+			backend_state.config.automatically_check_for_updates = parse_value (config_object.get_member ("automatically_check_for_updates"), Type.BOOLEAN).get_boolean ();
+			backend_state.config.notify_on_update_available = parse_value (config_object.get_member ("notify_on_update_available"), Type.BOOLEAN).get_boolean ();
+			backend_state.config.automatically_install_updates = parse_value (config_object.get_member ("automatically_install_updates"), Type.BOOLEAN).get_boolean ();
+			backend_state.config.default_install_path = parse_value (config_object.get_member ("default_install_path"), Type.STRING).get_string ();
 
 			lock (state) {
-				state.global_state = global_state;
+				state.backend_state = backend_state;
 				state_sig (state);
 			}
 		} catch (Error e) {

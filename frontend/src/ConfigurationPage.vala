@@ -48,7 +48,7 @@ class ConfigurationPage : Adw.PreferencesPage {
 		preferences_group.add (default_install_path_row);
 
 		Socket.instance.state_sig.connect ((_, state) => {
-			Configuration config = state.global_state.config;
+			Configuration config = state.backend_state.config;
 			automatically_check_for_updates_switch.state = config.automatically_check_for_updates;
 			automatically_check_for_updates_switch.active = config.automatically_check_for_updates;
 			notify_on_update_available_switch.state = config.notify_on_update_available;
