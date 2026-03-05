@@ -5,8 +5,8 @@ executable(
 		'src/ConfigurationPage.vala',
 		'src/Css.vala',
 		'src/FolderEntryRow.vala',
+		'src/Gui.vala',
 		'src/InstallPageFactory.vala',
-		'src/Main.vala',
 		'src/Progress.vala',
 		'src/ProgressBar.vala',
 		'src/ProgressRow.vala',
@@ -24,6 +24,22 @@ executable(
 		dependency('json-glib-1.0'),
 		dependency('libadwaita-1'),
 		dependency('gtk4'),
+		meson.get_compiler('vala').find_library('posix'),
+	],
+)
+
+executable(
+	'dislaunchctl',
+	files(
+		'src/Ctl.vala',
+		'src/Socket.vala',
+	),
+	dependencies: [
+		dependency('glib-2.0'),
+		dependency('gobject-2.0'),
+		dependency('gio-2.0'),
+		dependency('gio-unix-2.0'),
+		dependency('json-glib-1.0'),
 		meson.get_compiler('vala').find_library('posix'),
 	],
 )
