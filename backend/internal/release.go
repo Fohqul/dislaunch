@@ -337,15 +337,18 @@ func (release *Release) updateState() {
 }
 
 func (release *Release) GetState() *ReleaseState {
-	if !release.isInstalled() {
+	state, ok := release.state.Load().(*ReleaseState)
+
+	if !ok {
+		fmt.Fprintln(os.Stderr, "error loading release state: ", release) // todo should this be fatal?
 		return nil
 	}
 
-	if state, ok := release.state.Load().(*ReleaseState); ok {
-		return state
+	if !release.isInstalled() && state.Process.Status != "" {
+		return nil
 	}
 
-	return nil
+	return state
 }
 
 type latestVersion struct {
