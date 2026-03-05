@@ -14,7 +14,6 @@ public struct ReleaseInternal {
 
 public struct ReleaseProcess {
 	string status;
-	bool progress_window;
 	string message;
 	uint progress; // not a `uint8` because I can't be asked to deal with JSON parsing bs
 	string error;
@@ -210,7 +209,6 @@ class Socket {
 			var process_object = process.get_object ();
 			// try {
 			state.process.status = parse_value (process_object.get_member ("status"), Type.STRING).get_string ();
-			state.process.progress_window = parse_value (process_object.get_member ("progress_window"), Type.BOOLEAN).get_boolean ();
 			state.process.message = parse_value (process_object.get_member ("message"), Type.STRING).get_string ();
 			state.process.progress = parse_value (process_object.get_member ("progress"), Type.UINT).get_uint ();
 			state.process.error = parse_value (process_object.get_member ("error"), Type.STRING).get_string ();

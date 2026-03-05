@@ -73,13 +73,12 @@ const (
 )
 
 type Release struct {
-	mu             sync.Mutex
-	status         status
-	progressWindow bool
-	message        string
-	progress       uint8 // indeterminate progress when 101
-	err            error
-	state          atomic.Value
+	mu       sync.Mutex
+	status   status
+	message  string
+	progress uint8 // indeterminate progress when 101
+	err      error
+	state    atomic.Value
 }
 
 var Stable, PTB, Canary Release
@@ -297,11 +296,10 @@ func (release *Release) getVersion() (string, error) {
 }
 
 type releaseProcessView struct {
-	Status         string `json:"status"`
-	ProgressWindow bool   `json:"progress_window"`
-	Message        string `json:"message"`
-	Progress       uint8  `json:"progress"`
-	Error          string `json:"error"`
+	Status   string `json:"status"`
+	Message  string `json:"message"`
+	Progress uint8  `json:"progress"`
+	Error    string `json:"error"`
 }
 
 type ReleaseState struct {
@@ -326,7 +324,6 @@ func (release *Release) updateState() {
 	}
 
 	state.Process.Status = string(release.status)
-	state.Process.ProgressWindow = release.progressWindow
 	state.Process.Message = release.message
 	state.Process.Progress = release.progress
 	if release.err != nil {
