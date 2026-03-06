@@ -109,7 +109,7 @@ func main() {
 		}
 		defer close()
 
-		if os.Args[2] == "-p" {
+		if len(os.Args) > 2 && os.Args[2] == "-p" {
 			fmt.Printf("\n%s\n", STARTED) // surround with newlines so it's guaranteed to be picked up as a single line
 		}
 
