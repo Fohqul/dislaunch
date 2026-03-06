@@ -137,16 +137,22 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 
 func startWriter(conn net.Conn, entry *connectionEntry) {
 	for message := range entry.write {
-		if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
-			fmt.Fprintf(os.Stderr, "error setting write deadline: %s\n", err)
-		}
+		select {
+		case <-entry.ctx.Done():
+			log.Printf("Connection %p already closed - dropping message: %s\n", conn, message)
+			continue
+		default:
+			if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+				fmt.Fprintf(os.Stderr, "error setting write deadline: %s\n", err)
+			}
 
-		if _, err := conn.Write(message); err != nil {
-			if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
-				entry.cancel()
-				return
-			} else {
-				fmt.Fprintf(os.Stderr, "error writing to connection: %s\nMessage: %s", err, message)
+			if _, err := conn.Write(message); err != nil {
+				if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+					entry.cancel()
+					return
+				} else {
+					fmt.Fprintf(os.Stderr, "error writing to connection: %s\nMessage: %s", err, message)
+				}
 			}
 		}
 	}
