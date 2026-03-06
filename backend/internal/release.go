@@ -100,12 +100,12 @@ type releaseInternal struct {
 }
 
 func (release *Release) String() string {
-	switch *release {
-	case Stable:
+	switch release {
+	case &Stable:
 		return "stable"
-	case PTB:
+	case &PTB:
 		return "ptb"
-	case Canary:
+	case &Canary:
 		return "canary"
 	}
 
