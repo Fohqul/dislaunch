@@ -2,6 +2,7 @@ package dislaunch
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,9 +20,10 @@ import (
 var listener net.Listener
 
 type connectionEntry struct {
-	wg    sync.WaitGroup
-	write chan []byte
-	close chan byte
+	wg     sync.WaitGroup
+	ctx    context.Context
+	cancel context.CancelFunc
+	write  chan []byte
 }
 
 type connectionsContainer struct {
@@ -30,14 +32,6 @@ type connectionsContainer struct {
 }
 
 var container connectionsContainer
-
-func connectionOpen(conn net.Conn) bool {
-	container.mu.Lock()
-	defer container.mu.Unlock()
-
-	_, exists := container.connections[conn]
-	return listener != nil && exists
-}
 
 func releaseCommand(release *Release, data string, command []string) {
 	switch command[1] {
@@ -90,51 +84,55 @@ func setBoolean(set func(bool), setting string) {
 func startReader(conn net.Conn, entry *connectionEntry) {
 	reader := bufio.NewReader(conn)
 
-	for connectionOpen(conn) {
-		data, err := reader.ReadString('\n')
-		if err != nil {
-			if err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
-				break
+	for {
+		select {
+		case <-entry.ctx.Done():
+			return
+		default:
+			data, err := reader.ReadString('\n')
+			if err != nil {
+				if err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+					entry.cancel()
+					return
+				}
+
+				fmt.Fprintf(os.Stderr, "error reading buffered I/O: %s\n", err)
+				continue
 			}
+			log.Println("Connection received:", data)
+			command := strings.Fields(data)
 
-			fmt.Fprintf(os.Stderr, "error reading buffered I/O: %s\n", err)
-			continue
-		}
-		log.Println("Connection received:", data)
-		command := strings.Fields(data)
-
-		switch command[0] {
-		case "state":
-			go BroadcastBackendState()
-		case "stable":
-			go releaseCommand(&Stable, data, command)
-		case "ptb":
-			go releaseCommand(&PTB, data, command)
-		case "canary":
-			go releaseCommand(&Canary, data, command)
-		case "config":
-			// i should be taken out back for nesting switch statements like this. there is certainly a better way of handling commands/subcommands/arguments
-			switch command[1] {
-			case "automatically_check_for_updates":
-				setBoolean(SetAutomaticallyCheckForUpdates, command[2])
-			case "notify_on_update_available":
-				setBoolean(SetNotifyOnUpdateAvailable, command[2])
-			case "automatically_install_updates":
-				setBoolean(SetAutomaticallyInstallUpdates, command[2])
-			case "default_install_path":
-				if err = SetDefaultInstallPath(command[2]); err != nil {
-					fmt.Fprintf(os.Stderr, "error setting default installation path: %s\n", err)
-					BroadcastBackendState() // if `SetDefaultInstallPath` fails, `setConfiguration` never runs and therefore `BroadcastBackendState` never runs
+			switch command[0] {
+			case "state":
+				go BroadcastBackendState()
+			case "stable":
+				go releaseCommand(&Stable, data, command)
+			case "ptb":
+				go releaseCommand(&PTB, data, command)
+			case "canary":
+				go releaseCommand(&Canary, data, command)
+			case "config":
+				// i should be taken out back for nesting switch statements like this. there is certainly a better way of handling commands/subcommands/arguments
+				switch command[1] {
+				case "automatically_check_for_updates":
+					setBoolean(SetAutomaticallyCheckForUpdates, command[2])
+				case "notify_on_update_available":
+					setBoolean(SetNotifyOnUpdateAvailable, command[2])
+				case "automatically_install_updates":
+					setBoolean(SetAutomaticallyInstallUpdates, command[2])
+				case "default_install_path":
+					if err = SetDefaultInstallPath(command[2]); err != nil {
+						fmt.Fprintf(os.Stderr, "error setting default installation path: %s\n", err)
+						BroadcastBackendState() // if `SetDefaultInstallPath` fails, `setConfiguration` never runs and therefore `BroadcastBackendState` never runs
+					}
+				default:
+					fmt.Fprintf(os.Stderr, "unknown configuration option: %s\n", command[1])
 				}
 			default:
-				fmt.Fprintf(os.Stderr, "unknown configuration option: %s\n", command[1])
+				fmt.Fprintf(os.Stderr, "unknown action: %s\n", command[0])
 			}
-		default:
-			fmt.Fprintf(os.Stderr, "unknown action: %s\n", command[0])
 		}
 	}
-
-	entry.close <- 0
 }
 
 func startWriter(conn net.Conn, entry *connectionEntry) {
@@ -145,15 +143,13 @@ func startWriter(conn net.Conn, entry *connectionEntry) {
 
 		if _, err := conn.Write(message); err != nil {
 			if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
-				break
+				entry.cancel()
+				return
 			} else {
 				fmt.Fprintf(os.Stderr, "error writing to connection: %s\nMessage: %s", err, message)
 			}
 		}
 	}
-
-	entry.wg.Done()
-	entry.close <- 0
 }
 
 func handleConnection(conn net.Conn) {
@@ -163,7 +159,13 @@ func handleConnection(conn net.Conn) {
 		container.mu.Unlock()
 		return
 	}
-	entry := &connectionEntry{write: make(chan []byte), close: make(chan byte)}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	entry := &connectionEntry{
+		ctx:    ctx,
+		cancel: cancel,
+		write:  make(chan []byte),
+	}
 	container.connections[conn] = entry
 	container.mu.Unlock()
 	log.Println("Accepted connection", conn)
@@ -173,7 +175,7 @@ func handleConnection(conn net.Conn) {
 		startWriter(conn, entry)
 	})
 
-	<-entry.close
+	<-entry.ctx.Done()
 	container.mu.Lock()
 	delete(container.connections, conn)
 	container.mu.Unlock()
@@ -234,7 +236,7 @@ func StartListener() (func(), error) {
 		container.mu.Lock()
 		defer container.mu.Unlock()
 		for _, entry := range container.connections {
-			entry.close <- 0
+			entry.cancel()
 		}
 	}, nil
 }
@@ -267,6 +269,11 @@ func BroadcastBackendState() {
 	container.mu.Lock()
 	defer container.mu.Unlock()
 	for _, entry := range container.connections {
-		entry.write <- message
+		select {
+		case <-entry.ctx.Done():
+			continue
+		default:
+			entry.write <- message
+		}
 	}
 }
