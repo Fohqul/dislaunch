@@ -466,7 +466,14 @@ func (release *Release) Install() {
 		}
 	}
 
-	installRealpath, err := filepath.EvalSymlinks(internal.InstallPath)
+	installPath := internal.InstallPath
+	if installPath == "" {
+		installPath = GetConfiguration().DefaultInstallPath
+		if installPath == "" {
+			installPath = GetDataHome()
+		}
+	}
+	installRealpath, err := filepath.EvalSymlinks(installPath)
 	if err != nil {
 		release.err = fmt.Errorf("error getting realpath of install path '%s': %w", internal.InstallPath, err)
 		release.updateState()
