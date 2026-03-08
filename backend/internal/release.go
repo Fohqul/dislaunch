@@ -323,10 +323,11 @@ func (release *Release) updateState() {
 		state.Version = version
 	}
 
-	state.Process = &releaseProcessView{}
-	state.Process.Status = string(release.status)
-	state.Process.Message = release.message
-	state.Process.Progress = release.progress
+	state.Process = &releaseProcessView{
+		Status:   string(release.status),
+		Message:  release.message,
+		Progress: release.progress,
+	}
 	if release.err != nil {
 		state.Process.Error = release.err.Error()
 	} else {
