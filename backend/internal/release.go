@@ -2,6 +2,7 @@ package dislaunch
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"github.com/gofrs/flock"
+	"github.com/mholt/archives"
 	cp "github.com/otiai10/copy"
 	"github.com/shirou/gopsutil/process"
 )
@@ -506,7 +508,87 @@ func (release *Release) Install() {
 		}
 	}
 
-	// TODO extract archive, delete previous downloads
+	// TODO delete previous downloads
+	tarball, err := os.Open(tarballPath)
+	if err != nil {
+		release.err = fmt.Errorf("error opening tarball: %w", err)
+		release.updateState()
+		return
+	}
+
+	format := archives.CompressedArchive{
+		Extraction:  archives.Tar{},
+		Compression: archives.Gz{},
+	}
+	path := filepath.Join(installRealpath, release.String())
+	if err = format.Extract(context.Background(), tarball, func(_ context.Context, info archives.FileInfo) error {
+		release.message = "Extracting " + info.NameInArchive
+
+		if info.IsDir() {
+			if err = os.MkdirAll(filepath.Join(path, info.NameInArchive), info.Mode().Perm()); err != nil {
+				release.err = fmt.Errorf("error creating extracted directory '%s': %w", info.NameInArchive, err)
+				release.updateState()
+				return err
+			}
+		} else {
+			source, err := info.Open()
+			if err != nil {
+				release.err = fmt.Errorf("error opening extracted file '%s': %w", info.NameInArchive, err)
+				release.updateState()
+				return err
+			}
+
+			destination, err := os.OpenFile(filepath.Join(path, info.NameInArchive), os.O_CREATE|os.O_WRONLY, info.Mode().Perm())
+			if err != nil {
+				release.err = fmt.Errorf("error opening destination file '%s': %w", path+info.NameInArchive, err)
+				release.updateState()
+				return err
+			}
+
+			buffer := make([]byte, 32*1024)
+			accumulated := 0
+			for {
+				n, err := source.Read(buffer)
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+
+					release.err = fmt.Errorf("error reading extracted file '%s': %w", info.NameInArchive, err)
+					release.updateState()
+					return err
+				}
+				accumulated += n
+				release.progress = uint8(float64(accumulated) / float64(info.Size()) * 100)
+				release.updateState()
+
+				if _, err = destination.Write(buffer[:n]); err != nil {
+					release.err = fmt.Errorf("error writing extracted file '%s': %w", info.NameInArchive, err)
+					release.updateState()
+					return err
+				}
+			}
+		}
+
+		return nil
+	}); err != nil {
+		release.err = fmt.Errorf("error extracting tarball: %w", err)
+		release.updateState()
+	}
+
+	// Even if extraction failed, that implies a possibly corrupted tarball, so still remove it
+	if err = os.Remove(tarballPath); err != nil {
+		release.err = fmt.Errorf("error deleting tarball: %w", err)
+		release.updateState()
+	}
+
+	if !installed {
+		release.setInternal(releaseInternal{
+			InstallPath:          installPath,
+			LastChecked:          time.Now(), // todo this is silly if we're using a cached tarball and signals that whether a release is installed should not be determined by the presence of its gob/internal data
+			BetterDiscordChannel: BDStable,
+		})
+	}
 }
 
 func (release *Release) uninjectBetterDiscord() {
