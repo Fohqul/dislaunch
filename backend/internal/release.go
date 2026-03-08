@@ -53,7 +53,7 @@ func download(source string, destination io.Writer, progress func(progress uint8
 			}
 		}
 
-		if _, err := destination.Write(buffer[:n]); err != nil {
+		if _, err = destination.Write(buffer[:n]); err != nil {
 			return fmt.Errorf("error writing to destination '%s': %w", destination, err)
 		}
 	}
