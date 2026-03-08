@@ -330,8 +330,6 @@ func (release *Release) updateState() {
 	}
 	if release.err != nil {
 		state.Process.Error = release.err.Error()
-	} else {
-		state.Process.Error = ""
 	}
 
 	release.state.Store(state)
