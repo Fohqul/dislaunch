@@ -323,10 +323,7 @@ func (release *Release) updateState() {
 		state.Version = version
 	}
 
-	if state.Process == nil {
-		state.Process = &releaseProcessView{}
-	}
-
+	state.Process = &releaseProcessView{}
 	state.Process.Status = string(release.status)
 	state.Process.Message = release.message
 	state.Process.Progress = release.progress
