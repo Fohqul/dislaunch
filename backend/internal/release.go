@@ -149,6 +149,7 @@ func (release *Release) openGob() (*os.File, func()) {
 		release.status = Fatal
 		release.message = "Failed to open internal release data"
 		release.err = err
+		release.updateState()
 		return nil, nil
 	}
 	file, err = os.Create(path)
