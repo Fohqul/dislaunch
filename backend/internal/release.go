@@ -160,13 +160,6 @@ func (release *Release) openGob() (*os.File, func()) {
 		release.updateState()
 		return nil, nil
 	}
-	if err = gob.NewEncoder(file).Encode(releaseInternal{}); err != nil {
-		release.status = Fatal
-		release.message = "Failed to encode internal data"
-		release.err = err
-		release.updateState()
-		return nil, nil
-	}
 	return file, close
 }
 
