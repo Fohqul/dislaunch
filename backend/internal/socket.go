@@ -99,6 +99,10 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 				fmt.Fprintf(os.Stderr, "error reading buffered I/O: %s\n", err)
 				continue
 			}
+			if data == "" {
+				continue
+			}
+
 			log.Println("Connection received:", data)
 			command := strings.Fields(data)
 
