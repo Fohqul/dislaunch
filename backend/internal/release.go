@@ -379,7 +379,7 @@ func (release *Release) GetState() *ReleaseState {
 		return nil
 	}
 
-	if !release.isInstalled() && state.Process.Status == "" {
+	if !release.isInstalled() && state.Process.Status == string(None) {
 		return nil
 	}
 
