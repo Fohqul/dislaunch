@@ -34,14 +34,15 @@ func download(source string, destination io.Writer, progress func(progress uint8
 
 	buffer := make([]byte, 32*1024)
 	accumulated := 0
-	for {
+	finished := false
+	for !finished {
 		n, err := response.Body.Read(buffer)
 		if err != nil {
 			if err == io.EOF {
-				break
+				finished = true
+			} else {
+				return fmt.Errorf("error reading response body: %w", err)
 			}
-
-			return fmt.Errorf("error reading response body: %w", err)
 		}
 		accumulated += n
 
