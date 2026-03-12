@@ -64,18 +64,18 @@ func download(source string, destination io.Writer, progress func(progress uint8
 type status string
 
 const (
-	None                   status = ""
-	Download               status = "download"
-	Install                status = "install"
-	UpdateCheck            status = "update_check"
-	BetterDiscordInjection status = "bd_injection"
-	Move                   status = "move"
-	Uninstall              status = "uninstall"
+	statusNone                   status = ""
+	statusDownload               status = "download"
+	statusInstall                status = "install"
+	statusUpdateCheck            status = "update_check"
+	statusBetterDiscordInjection status = "bd_injection"
+	statusMove                   status = "move"
+	statusUninstall              status = "uninstall"
 	// A fatal status indicates that, when a release is installed, something has gone seriously wrong and
 	// the application has reached a state it never should have. Processes should return immediately when
 	// the state becomes fatal so as to prevent further damage being done or further errors occurring.
 	// However, a fatal status is expected when the release is not installed.
-	Fatal status = "fatal"
+	statusFatal status = "fatal"
 )
 
 // A "process" is essentially a method of `Release` which is
@@ -161,7 +161,7 @@ func (release *Release) openGob(flag int) (*os.File, func()) {
 	lock.Lock()
 	file, err := os.OpenFile(path, os.O_CREATE|flag, 0600)
 	if err != nil {
-		release.status = Fatal
+		release.status = statusFatal
 		release.message = "Failed to open internal release data"
 		release.err = err
 		release.updateState()
@@ -181,7 +181,7 @@ func (release *Release) setInternal(internal releaseInternal) error {
 	defer close()
 
 	if err := gob.NewEncoder(file).Encode(internal); err != nil {
-		release.status = Fatal
+		release.status = statusFatal
 		release.message = "Failed to encode internal data"
 		release.err = err
 		release.updateState()
@@ -203,7 +203,7 @@ func (release *Release) getInternal() (releaseInternal, error) {
 
 	var internal releaseInternal
 	if err := gob.NewDecoder(file).Decode(&internal); err != nil {
-		release.status = Fatal
+		release.status = statusFatal
 		release.message = "Failed to decode internal data"
 		release.err = err
 		return releaseInternal{}, err
@@ -293,7 +293,7 @@ func (release *Release) getVersion() (string, error) {
 		return "", err
 	}
 	if info.ReleaseChannel != release.String() {
-		release.status = Fatal
+		release.status = statusFatal
 		release.message = "Release is installed, but it reports an unexpected release channel"
 		release.err = fmt.Errorf("mismatched release channel: %s", info.ReleaseChannel)
 		return "", release.err
@@ -343,7 +343,7 @@ func (release *Release) updateState() {
 }
 
 func (release *Release) resetState() {
-	release.status = None
+	release.status = statusNone
 	release.message = ""
 	release.progress = 0
 	release.err = nil
@@ -379,7 +379,7 @@ func (release *Release) GetState() *ReleaseState {
 		return nil
 	}
 
-	if !release.isInstalled() && state.Process.Status == string(None) {
+	if !release.isInstalled() && state.Process.Status == string(statusNone) {
 		return nil
 	}
 
@@ -395,7 +395,7 @@ func (release *Release) CheckForUpdates() {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
-	if release.status == Fatal {
+	if release.status == statusFatal {
 		return
 	}
 
@@ -406,7 +406,7 @@ func (release *Release) CheckForUpdates() {
 
 	defer release.resetState()
 
-	release.status = UpdateCheck
+	release.status = statusUpdateCheck
 	release.message = "Checking for updates"
 	release.progress = 101
 	release.updateState()
@@ -441,7 +441,7 @@ func (release *Release) Install() {
 		return
 	}
 
-	if installed && release.status == Fatal {
+	if installed && release.status == statusFatal {
 		return
 	}
 
@@ -457,7 +457,7 @@ func (release *Release) Install() {
 		return
 	}
 
-	release.status = Install
+	release.status = statusInstall
 	release.updateState()
 
 	tarballPath := filepath.Join(GetHomeXDGDirectory("XDG_CACHE_HOME", ".cache"), release.String())
@@ -632,7 +632,7 @@ func (release *Release) uninjectBetterDiscord() {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
-	if release.status == Fatal {
+	if release.status == statusFatal {
 		return
 	}
 
@@ -648,7 +648,7 @@ func (release *Release) injectBetterDiscord() {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
-	if release.status == Fatal {
+	if release.status == statusFatal {
 		return
 	}
 
@@ -664,7 +664,7 @@ func (release *Release) Move(path string) {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
-	if release.status == Fatal {
+	if release.status == statusFatal {
 		return
 	}
 
@@ -701,7 +701,7 @@ func (release *Release) Uninstall() {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
-	if release.status == Fatal {
+	if release.status == statusFatal {
 		return
 	}
 
@@ -712,7 +712,7 @@ func (release *Release) Uninstall() {
 
 	defer release.resetState()
 
-	release.status = Uninstall
+	release.status = statusUninstall
 	release.message = "Deleting " + internal.InstallPath
 	release.progress = 101
 	release.updateState()
@@ -721,12 +721,12 @@ func (release *Release) Uninstall() {
 	// todo perhaps consider some safeguards to prevent deleting critical directories?
 	if err = os.RemoveAll(internal.InstallPath); err != nil {
 		fmt.Fprintf(os.Stderr, "error uninstalling release '%s' from '%s': %s\n", release, internal.InstallPath, err)
-		release.status = Fatal
+		release.status = statusFatal
 		release.message = "Failed to uninstall"
 		release.err = err
 	} else if err = os.Remove(release.getGobPath()); err != nil {
 		fmt.Fprintf(os.Stderr, "error deleting gob for release '%s': %s\n", release, err)
-		release.status = Fatal
+		release.status = statusFatal
 		release.message = "Failed to delete internal data at '" + release.getGobPath() + "'"
 		release.err = err
 	}
