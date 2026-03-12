@@ -329,7 +329,19 @@ func (release *Release) resetState() {
 }
 
 func (release *Release) GetState() *ReleaseState {
-	state, ok := release.state.Load().(*ReleaseState)
+	value := release.state.Load()
+
+	if value == nil {
+		go func() {
+			// TODO there should be a better mechanism than this for automatically loading in the value without the need for a process
+			release.mu.Lock()
+			defer release.mu.Unlock()
+			release.updateState()
+		}()
+		return nil
+	}
+
+	state, ok := value.(*ReleaseState)
 
 	if !ok {
 		fmt.Fprintln(os.Stderr, "error loading release state: ", release) // todo should this be fatal?
