@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -133,39 +132,27 @@ func (release *Release) isInstalled() bool {
 	return false
 }
 
-func (release *Release) openGob() (*os.File, func()) {
+func (release *Release) openGob(flag int) (*os.File, func()) {
 	path := release.getGobPath()
 	lock := flock.New(path)
 	// Whilst we would ideally allow `getInternal` to take a shared lock, it may be replaced with an exclusive lock by a call to `setInternal`. See https://pkg.go.dev/github.com/gofrs/flock#Flock.Lock
 	lock.Lock()
-	file, err := os.Open(path)
-	close := func() {
-		file.Close()
-		lock.Unlock()
-	}
-	if err == nil {
-		return file, close
-	}
-	if !errors.Is(err, fs.ErrNotExist) {
+	file, err := os.OpenFile(path, os.O_CREATE|flag, 0600)
+	if err != nil {
 		release.status = Fatal
 		release.message = "Failed to open internal release data"
 		release.err = err
 		release.updateState()
 		return nil, nil
 	}
-	file, err = os.Create(path)
-	if err != nil {
-		release.status = Fatal
-		release.message = "Failed to create internal release data"
-		release.err = err
-		release.updateState()
-		return nil, nil
+	return file, func() {
+		file.Close()
+		lock.Unlock()
 	}
-	return file, close
 }
 
 func (release *Release) setInternal(internal releaseInternal) error {
-	file, close := release.openGob()
+	file, close := release.openGob(os.O_WRONLY)
 	if file == nil || close == nil {
 		return fmt.Errorf("error opening gob")
 	}
@@ -186,7 +173,7 @@ func (release *Release) getInternal() (releaseInternal, error) {
 		return releaseInternal{}, fmt.Errorf("release '%s' is not installed", release)
 	}
 
-	file, close := release.openGob()
+	file, close := release.openGob(os.O_RDONLY)
 	if file == nil || close == nil {
 		return releaseInternal{}, fmt.Errorf("error opening gob")
 	}
