@@ -358,15 +358,15 @@ func (release *Release) CheckForUpdates() {
 	release.progress = 101
 	release.updateState()
 
-	buffer := bytes.NewBuffer(make([]byte, 1024))
-	if err := download("https://discord.com/api/"+release.String()+"/updates?platform=linux", buffer, nil); err != nil {
+	var buffer bytes.Buffer
+	if err := download("https://discord.com/api/"+release.String()+"/updates?platform=linux", &buffer, nil); err != nil {
 		release.err = fmt.Errorf("error downloading latest version info: %w", err)
 		release.updateState()
 		return
 	}
 
 	var latestVersion latestVersion
-	if err := json.NewDecoder(buffer).Decode(&latestVersion); err != nil {
+	if err := json.NewDecoder(&buffer).Decode(&latestVersion); err != nil {
 		release.err = fmt.Errorf("error decoding latest version info: %w", err)
 		release.updateState()
 		return
