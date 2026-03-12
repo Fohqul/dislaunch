@@ -320,6 +320,14 @@ func (release *Release) updateState() {
 	BroadcastBackendState()
 }
 
+func (release *Release) resetState() {
+	release.status = None
+	release.message = ""
+	release.progress = 0
+	release.err = nil
+	release.updateState()
+}
+
 func (release *Release) GetState() *ReleaseState {
 	state, ok := release.state.Load().(*ReleaseState)
 
@@ -352,6 +360,8 @@ func (release *Release) CheckForUpdates() {
 	if err != nil {
 		return
 	}
+
+	defer release.resetState()
 
 	release.status = UpdateCheck
 	release.message = "Checking for updates"
@@ -391,6 +401,8 @@ func (release *Release) Install() {
 	if installed && release.status == Fatal {
 		return
 	}
+
+	defer release.resetState()
 
 	version, err := release.getVersion()
 	if installed && err != nil {
@@ -618,6 +630,8 @@ func (release *Release) Move(path string) {
 		return
 	}
 
+	defer release.resetState()
+
 	err = os.Rename(internal.InstallPath, path)
 	if err == nil {
 		internal.InstallPath = path
@@ -652,6 +666,8 @@ func (release *Release) Uninstall() {
 	if err != nil {
 		return
 	}
+
+	defer release.resetState()
 
 	release.status = Uninstall
 	release.message = "Deleting " + internal.InstallPath
