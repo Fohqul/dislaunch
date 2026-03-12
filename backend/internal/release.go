@@ -71,12 +71,21 @@ const (
 	BetterDiscordInjection status = "bd_injection"
 	Move                   status = "move"
 	Uninstall              status = "uninstall"
-	Fatal                  status = "fatal"
+	// A fatal status indicates that, when a release is installed, something has gone seriously wrong and
+	// the application has reached a state it never should have. Processes should return immediately when
+	// the state becomes fatal so as to prevent further damage being done or further errors occurring.
+	// However, a fatal status is expected when the release is not installed.
+	Fatal status = "fatal"
 )
+
+// A "process" is essentially a method of `Release` which is
+// publicly accessible, such as `CheckForUpdates`, `Move` and
+// `Install`, along with the state associated with that,
+// such as `status`, `message`, `progress` and `err`.
 
 type Release struct {
 	mu       sync.Mutex
-	status   status
+	status   status // currently active process
 	message  string
 	progress uint8 // indeterminate progress when 101
 	err      error
@@ -132,6 +141,19 @@ func (release *Release) isInstalled() bool {
 	return false
 }
 
+// Any errors in dealing with internal release data
+// (e.g. opening the gob, encoding/decoding) are always
+// considered fatal. So that their callers don't all need
+// to handle updating the release's state (`release.status
+// = Fatal`, `release.err = err` etc.), the helpers `openGob`,
+// `setInternal`, `getInternal` and `getVersion` all do this
+// automatically. Therefore, their callers must not only hold
+// the lock, but also return immediately if these helpers
+// return an error, as that means the status is fatal (unless
+// it is expected to be, such as when the release isn't
+// installed.)
+
+// `nil, nil` return value means an error occurred
 func (release *Release) openGob(flag int) (*os.File, func()) {
 	path := release.getGobPath()
 	lock := flock.New(path)
@@ -329,6 +351,15 @@ func (release *Release) resetState() {
 }
 
 func (release *Release) GetState() *ReleaseState {
+	// `GetState` returns the atomic value `release.state`
+	// because if it composed/constructed the state using
+	// `getInternal` and `getVersion`, it would require the
+	// lock. But in many cases, that lock is held by an
+	// active process, which prevents progress reports from
+	// being broadcast. So, processes use the `updateState`
+	// helper (whose callers already own the lock) to mutate
+	// `release.state`, which `GetState` then reads from.
+
 	value := release.state.Load()
 
 	if value == nil {
