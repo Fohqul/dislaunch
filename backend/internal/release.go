@@ -211,59 +211,6 @@ func (release *Release) getInternal() (releaseInternal, error) {
 	return internal, nil
 }
 
-func (release *Release) SetCommandLineArguments(commandLineArguments string) error {
-	release.mu.Lock()
-	defer release.mu.Unlock()
-
-	internal, err := release.getInternal()
-	if err != nil {
-		return err
-	}
-
-	internal.CommandLineArguments = commandLineArguments
-	return release.setInternal(internal)
-}
-
-func (release *Release) SetBetterDiscordEnabled(betterDiscordEnabled bool) error {
-	release.mu.Lock()
-	defer release.mu.Unlock()
-
-	internal, err := release.getInternal()
-	if err != nil {
-		return err
-	}
-
-	internal.BetterDiscordEnabled = betterDiscordEnabled
-	if err = release.setInternal(internal); err != nil {
-		return err
-	}
-
-	if betterDiscordEnabled {
-		go release.injectBetterDiscord()
-	} else {
-		go release.uninjectBetterDiscord()
-	}
-	return nil
-}
-
-func (release *Release) SetBetterDiscordChannel(betterDiscordChannel BetterDiscordChannel) error {
-	release.mu.Lock()
-	defer release.mu.Unlock()
-
-	internal, err := release.getInternal()
-	if err != nil {
-		return err
-	}
-
-	internal.BetterDiscordChannel = betterDiscordChannel
-	if err = release.setInternal(internal); err != nil {
-		return err
-	}
-
-	go release.injectBetterDiscord()
-	return nil
-}
-
 /**
  * Since Discord installs expose their version in `resources/build_info.json`,
  * we can always just read from there to get the installed version without the
@@ -380,6 +327,59 @@ func (release *Release) GetState() *ReleaseState {
 	}
 
 	return state
+}
+
+func (release *Release) SetCommandLineArguments(commandLineArguments string) error {
+	release.mu.Lock()
+	defer release.mu.Unlock()
+
+	internal, err := release.getInternal()
+	if err != nil {
+		return err
+	}
+
+	internal.CommandLineArguments = commandLineArguments
+	return release.setInternal(internal)
+}
+
+func (release *Release) SetBetterDiscordEnabled(betterDiscordEnabled bool) error {
+	release.mu.Lock()
+	defer release.mu.Unlock()
+
+	internal, err := release.getInternal()
+	if err != nil {
+		return err
+	}
+
+	internal.BetterDiscordEnabled = betterDiscordEnabled
+	if err = release.setInternal(internal); err != nil {
+		return err
+	}
+
+	if betterDiscordEnabled {
+		go release.injectBetterDiscord()
+	} else {
+		go release.uninjectBetterDiscord()
+	}
+	return nil
+}
+
+func (release *Release) SetBetterDiscordChannel(betterDiscordChannel BetterDiscordChannel) error {
+	release.mu.Lock()
+	defer release.mu.Unlock()
+
+	internal, err := release.getInternal()
+	if err != nil {
+		return err
+	}
+
+	internal.BetterDiscordChannel = betterDiscordChannel
+	if err = release.setInternal(internal); err != nil {
+		return err
+	}
+
+	go release.injectBetterDiscord()
+	return nil
 }
 
 type latestVersion struct {
