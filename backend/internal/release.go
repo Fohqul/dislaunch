@@ -684,21 +684,27 @@ func (release *Release) Move(path string) {
 		internal.InstallPath = path
 		release.setInternal(internal)
 		return
-	} else if err.(*os.LinkError).Err.(syscall.Errno) == syscall.EXDEV {
-		if err = cp.Copy(internal.InstallPath, path, cp.Options{Sync: true, PreserveTimes: true, PreserveOwner: true}); err == nil {
-			if err = os.RemoveAll(internal.InstallPath); err != nil {
-				release.err = fmt.Errorf("error removing previous install path '%s': %w", internal.InstallPath, err)
-				release.updateState()
-			}
-
-			internal.InstallPath = path
-			release.setInternal(internal)
-			return
-		}
 	}
 
-	release.err = fmt.Errorf("error moving release '%s' to '%s': %w", release, path, err)
-	release.updateState()
+	if err.(*os.LinkError).Err.(syscall.Errno) != syscall.EXDEV {
+		release.err = fmt.Errorf("error moving release '%s' to '%s': %w", release, path, err)
+		release.updateState()
+		return
+	}
+
+	if err = cp.Copy(internal.InstallPath, path, cp.Options{Sync: true, PreserveTimes: true, PreserveOwner: true}); err != nil {
+		release.err = fmt.Errorf("error copying release '%s' to '%s': %w", release, path, err)
+		release.updateState()
+		return
+	}
+
+	if err = os.RemoveAll(internal.InstallPath); err != nil {
+		release.err = fmt.Errorf("error removing previous install path '%s': %w", internal.InstallPath, err)
+		release.updateState()
+	}
+
+	internal.InstallPath = path
+	release.setInternal(internal)
 }
 
 func (release *Release) Uninstall() {
