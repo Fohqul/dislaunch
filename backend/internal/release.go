@@ -327,39 +327,39 @@ func (release *Release) GetState() *ReleaseState {
 	return state
 }
 
-func (release *Release) SetCommandLineArguments(commandLineArguments string) error {
+func (release *Release) SetCommandLineArguments(commandLineArguments string) {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
 	if release.status == statusFatal {
-		return release.err
+		return
 	}
 
 	internal, err := release.getInternal()
 	if err != nil {
-		return err
+		return
 	}
 
 	internal.CommandLineArguments = commandLineArguments
-	return release.setInternal(internal)
+	release.setInternal(internal)
 }
 
-func (release *Release) SetBdEnabled(bdEnabled bool) error {
+func (release *Release) SetBdEnabled(bdEnabled bool) {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
 	if release.status == statusFatal {
-		return release.err
+		return
 	}
 
 	internal, err := release.getInternal()
 	if err != nil {
-		return err
+		return
 	}
 
 	internal.BdEnabled = bdEnabled
-	if err = release.setInternal(internal); err != nil {
-		return err
+	if release.setInternal(internal) != nil {
+		return
 	}
 
 	if bdEnabled {
@@ -367,29 +367,27 @@ func (release *Release) SetBdEnabled(bdEnabled bool) error {
 	} else {
 		go release.uninjectBd()
 	}
-	return nil
 }
 
-func (release *Release) SetBdChannel(bdChannel BdChannel) error {
+func (release *Release) SetBdChannel(bdChannel BdChannel) {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
 	if release.status == statusFatal {
-		return release.err
+		return
 	}
 
 	internal, err := release.getInternal()
 	if err != nil {
-		return err
+		return
 	}
 
 	internal.BdChannel = bdChannel
-	if err = release.setInternal(internal); err != nil {
-		return err
+	if release.setInternal(internal) != nil {
+		return
 	}
 
 	go release.injectBd()
-	return nil
 }
 
 func (release *Release) CheckForUpdates() {

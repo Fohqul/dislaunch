@@ -35,20 +35,14 @@ func releaseCommand(release *Release, data string, command []string) {
 	switch command[1] {
 	case "bd_enabled":
 		setBoolean(func(enabled bool) {
-			if err := release.SetBdEnabled(enabled); err != nil {
-				fmt.Fprintf(os.Stderr, "failed to set BetterDiscord enabled: %s\n", err)
-			}
+			go release.SetBdEnabled(enabled)
 		}, command[2])
 	case "bd_channel":
 		switch command[2] {
 		case "stable":
-			if err := release.SetBdChannel(BdStable); err != nil {
-				fmt.Fprintf(os.Stderr, "failed to set BetterDiscord channel: %s\n", err)
-			}
+			go release.SetBdChannel(BdStable)
 		case "canary":
-			if err := release.SetBdChannel(BdCanary); err != nil {
-				fmt.Fprintf(os.Stderr, "failed to set BetterDiscord channel: %s\n", err)
-			}
+			go release.SetBdChannel(BdCanary)
 		default:
 			fmt.Fprintf(os.Stderr, "unknown BetterDiscord channel: %s\n", command[2])
 		}
