@@ -387,7 +387,9 @@ func (release *Release) SetBdChannel(bdChannel BdChannel) {
 		return
 	}
 
-	go release.injectBd()
+	if internal.BdEnabled {
+		go release.injectBd()
+	}
 }
 
 func (release *Release) CheckForUpdates() {
