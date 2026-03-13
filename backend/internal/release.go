@@ -317,15 +317,11 @@ type ReleaseState struct {
 func (release *Release) updateState() {
 	state := &ReleaseState{}
 
-	if internal, err := release.getInternal(); err != nil {
-		state.Internal = nil
-	} else {
+	if internal, err := release.getInternal(); err == nil {
 		state.Internal = &internal
 	}
 
-	if version, err := release.getVersion(); err != nil {
-		state.Version = ""
-	} else {
+	if version, err := release.getVersion(); err == nil {
 		state.Version = version
 	}
 
