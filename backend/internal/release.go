@@ -284,6 +284,10 @@ func (release *Release) updateState() {
 }
 
 func (release *Release) resetState() {
+	if release.status == statusFatal {
+		return
+	}
+
 	release.status = statusNone
 	release.message = ""
 	release.progress = 0
