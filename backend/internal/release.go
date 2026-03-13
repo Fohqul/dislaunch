@@ -37,11 +37,11 @@ func download(source string, destination io.Writer, progress func(progress uint8
 	for !finished {
 		n, err := response.Body.Read(buffer)
 		if err != nil {
-			if err == io.EOF {
-				finished = true
-			} else {
+			if err != io.EOF {
 				return fmt.Errorf("error reading response body: %w", err)
 			}
+
+			finished = true
 		}
 		accumulated += n
 
@@ -64,13 +64,13 @@ func download(source string, destination io.Writer, progress func(progress uint8
 type status string
 
 const (
-	statusNone                   status = ""
-	statusDownload               status = "download"
-	statusInstall                status = "install"
-	statusUpdateCheck            status = "update_check"
-	statusBetterDiscordInjection status = "bd_injection"
-	statusMove                   status = "move"
-	statusUninstall              status = "uninstall"
+	statusNone        status = ""
+	statusDownload    status = "download"
+	statusInstall     status = "install"
+	statusUpdateCheck status = "update_check"
+	statusBdInjection status = "bd_injection"
+	statusMove        status = "move"
+	statusUninstall   status = "uninstall"
 	// A fatal status indicates that, when a release is installed, something has gone seriously wrong and
 	// the application has reached a state it never should have. Processes should return immediately when
 	// the state becomes fatal so as to prevent further damage being done or further errors occurring.
@@ -94,20 +94,20 @@ type Release struct {
 
 var Stable, PTB, Canary Release
 
-type BetterDiscordChannel string
+type BdChannel string
 
 const (
-	BDStable BetterDiscordChannel = "stable"
-	BDCanary BetterDiscordChannel = "canary"
+	BdStable BdChannel = "stable"
+	BdCanary BdChannel = "canary"
 )
 
 type releaseInternal struct {
-	InstallPath          string               `json:"install_path"`
-	LastChecked          time.Time            `json:"last_checked"`
-	LatestVersion        string               `json:"latest_version"`
-	CommandLineArguments string               `json:"command_line_arguments"`
-	BetterDiscordEnabled bool                 `json:"bd_enabled"`
-	BetterDiscordChannel BetterDiscordChannel `json:"bd_channel"`
+	InstallPath          string    `json:"install_path"`
+	LastChecked          time.Time `json:"last_checked"`
+	LatestVersion        string    `json:"latest_version"`
+	CommandLineArguments string    `json:"command_line_arguments"`
+	BdEnabled            bool      `json:"bd_enabled"`
+	BdChannel            BdChannel `json:"bd_channel"`
 }
 
 func (release *Release) String() string {
@@ -344,7 +344,7 @@ func (release *Release) SetCommandLineArguments(commandLineArguments string) err
 	return release.setInternal(internal)
 }
 
-func (release *Release) SetBetterDiscordEnabled(betterDiscordEnabled bool) error {
+func (release *Release) SetBdEnabled(bdEnabled bool) error {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
@@ -357,20 +357,20 @@ func (release *Release) SetBetterDiscordEnabled(betterDiscordEnabled bool) error
 		return err
 	}
 
-	internal.BetterDiscordEnabled = betterDiscordEnabled
+	internal.BdEnabled = bdEnabled
 	if err = release.setInternal(internal); err != nil {
 		return err
 	}
 
-	if betterDiscordEnabled {
-		go release.injectBetterDiscord()
+	if bdEnabled {
+		go release.injectBd()
 	} else {
-		go release.uninjectBetterDiscord()
+		go release.uninjectBd()
 	}
 	return nil
 }
 
-func (release *Release) SetBetterDiscordChannel(betterDiscordChannel BetterDiscordChannel) error {
+func (release *Release) SetBdChannel(bdChannel BdChannel) error {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
@@ -383,12 +383,12 @@ func (release *Release) SetBetterDiscordChannel(betterDiscordChannel BetterDisco
 		return err
 	}
 
-	internal.BetterDiscordChannel = betterDiscordChannel
+	internal.BdChannel = bdChannel
 	if err = release.setInternal(internal); err != nil {
 		return err
 	}
 
-	go release.injectBetterDiscord()
+	go release.injectBd()
 	return nil
 }
 
@@ -625,14 +625,14 @@ func (release *Release) Install() {
 
 	if !installed {
 		release.setInternal(releaseInternal{
-			InstallPath:          installPath,
-			LastChecked:          time.Now(), // todo this is silly if we're using a cached tarball and signals that whether a release is installed should not be determined by the presence of its gob/internal data
-			BetterDiscordChannel: BDStable,
+			InstallPath: installPath,
+			LastChecked: time.Now(), // todo this is silly if we're using a cached tarball and signals that whether a release is installed should not be determined by the presence of its gob/internal data
+			BdChannel:   BdStable,
 		})
 	}
 }
 
-func (release *Release) uninjectBetterDiscord() {
+func (release *Release) uninjectBd() {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
@@ -648,7 +648,7 @@ func (release *Release) uninjectBetterDiscord() {
 	// TODO
 }
 
-func (release *Release) injectBetterDiscord() {
+func (release *Release) injectBd() {
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
