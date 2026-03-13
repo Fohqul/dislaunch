@@ -217,11 +217,6 @@ func (release *Release) getInternal() (releaseInternal, error) {
  * need to keep track of it ourselves.
  */
 
-type buildInfo struct {
-	Version        string `json:"version"`
-	ReleaseChannel string `json:"releaseChannel"`
-}
-
 func (release *Release) getVersion() (string, error) {
 	internal, err := release.getInternal()
 	if err != nil {
@@ -234,18 +229,21 @@ func (release *Release) getVersion() (string, error) {
 	}
 	defer file.Close()
 
-	var info buildInfo
-	err = json.NewDecoder(file).Decode(&info)
+	var buildInfo struct {
+		Version        string `json:"version"`
+		ReleaseChannel string `json:"releaseChannel"`
+	}
+	err = json.NewDecoder(file).Decode(&buildInfo)
 	if err != nil {
 		return "", err
 	}
-	if info.ReleaseChannel != release.String() {
+	if buildInfo.ReleaseChannel != release.String() {
 		release.status = statusFatal
 		release.message = "Release is installed, but it reports an unexpected release channel"
-		release.err = fmt.Errorf("mismatched release channel: %s", info.ReleaseChannel)
+		release.err = fmt.Errorf("mismatched release channel: %s", buildInfo.ReleaseChannel)
 		return "", release.err
 	}
-	return info.Version, nil
+	return buildInfo.Version, nil
 }
 
 type releaseProcessView struct {
@@ -382,11 +380,6 @@ func (release *Release) SetBetterDiscordChannel(betterDiscordChannel BetterDisco
 	return nil
 }
 
-type latestVersion struct {
-	Name string `json:"name"`
-	// `pub_date` isn't used
-}
-
 func (release *Release) CheckForUpdates() {
 	release.mu.Lock()
 	defer release.mu.Unlock()
@@ -414,7 +407,10 @@ func (release *Release) CheckForUpdates() {
 		return
 	}
 
-	var latestVersion latestVersion
+	var latestVersion struct {
+		Name string `json:"name"`
+		// `pub_date` isn't used
+	}
 	if err := json.NewDecoder(&buffer).Decode(&latestVersion); err != nil {
 		release.err = fmt.Errorf("error decoding latest version info: %w", err)
 		release.updateState()

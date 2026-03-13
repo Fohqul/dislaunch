@@ -26,12 +26,10 @@ type connectionEntry struct {
 	write  chan []byte
 }
 
-type connectionsContainer struct {
+var container struct {
 	mu          sync.Mutex
 	connections map[net.Conn]*connectionEntry
 }
-
-var container connectionsContainer
 
 func releaseCommand(release *Release, data string, command []string) {
 	switch command[1] {
