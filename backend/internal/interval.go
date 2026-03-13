@@ -12,7 +12,7 @@ import (
 func runInterval(configuration Configuration, release *Release) {
 	release.CheckForUpdates()
 	state := release.GetState()
-	if state.Version == state.Internal.LatestVersion {
+	if state == nil || state.Version == state.Internal.LatestVersion {
 		return
 	}
 
