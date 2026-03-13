@@ -495,7 +495,11 @@ func (release *Release) Install() {
 		}
 		defer file.Close()
 
-		release.message = "Downloading version " + internal.LatestVersion
+		if internal.LatestVersion != "" {
+			release.message = "Downloading version " + internal.LatestVersion
+		} else {
+			release.message = "Downloading latest version"
+		}
 		if err = download("https://discord.com/api/download/"+release.String()+"?platform=linux&format=tar.gz", file, func(progress uint8) {
 			release.progress = progress
 			release.updateState()
