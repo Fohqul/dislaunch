@@ -233,8 +233,7 @@ func (release *Release) getVersion() (string, error) {
 		Version        string `json:"version"`
 		ReleaseChannel string `json:"releaseChannel"`
 	}
-	err = json.NewDecoder(file).Decode(&buildInfo)
-	if err != nil {
+	if err = json.NewDecoder(file).Decode(&buildInfo); err != nil {
 		return "", err
 	}
 	if buildInfo.ReleaseChannel != release.String() {
