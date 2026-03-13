@@ -31,6 +31,17 @@ var container struct {
 	connections map[net.Conn]*connectionEntry
 }
 
+func setBoolean(set func(bool), setting string) {
+	switch setting {
+	case "0":
+		set(false)
+	case "1":
+		set(true)
+	default:
+		fmt.Fprintf(os.Stderr, "invalid boolean setting: %s\n", setting)
+	}
+}
+
 func releaseCommand(release *Release, data string, command []string) {
 	switch command[1] {
 	case "bd_enabled":
@@ -59,17 +70,6 @@ func releaseCommand(release *Release, data string, command []string) {
 		go release.Uninstall()
 	default:
 		fmt.Fprintf(os.Stderr, "unknown argument: %s\n", command[1])
-	}
-}
-
-func setBoolean(set func(bool), setting string) {
-	switch setting {
-	case "0":
-		set(false)
-	case "1":
-		set(true)
-	default:
-		fmt.Fprintf(os.Stderr, "invalid boolean setting: %s\n", setting)
 	}
 }
 
