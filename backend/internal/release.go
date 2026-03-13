@@ -331,6 +331,10 @@ func (release *Release) SetCommandLineArguments(commandLineArguments string) err
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
+	if release.status == statusFatal {
+		return release.err
+	}
+
 	internal, err := release.getInternal()
 	if err != nil {
 		return err
@@ -343,6 +347,10 @@ func (release *Release) SetCommandLineArguments(commandLineArguments string) err
 func (release *Release) SetBetterDiscordEnabled(betterDiscordEnabled bool) error {
 	release.mu.Lock()
 	defer release.mu.Unlock()
+
+	if release.status == statusFatal {
+		return release.err
+	}
 
 	internal, err := release.getInternal()
 	if err != nil {
@@ -365,6 +373,10 @@ func (release *Release) SetBetterDiscordEnabled(betterDiscordEnabled bool) error
 func (release *Release) SetBetterDiscordChannel(betterDiscordChannel BetterDiscordChannel) error {
 	release.mu.Lock()
 	defer release.mu.Unlock()
+
+	if release.status == statusFatal {
+		return release.err
+	}
 
 	internal, err := release.getInternal()
 	if err != nil {
