@@ -156,7 +156,7 @@ class Progress : Adw.Application {
 		application_window.present ();
 		// Socket.instance.state_sig.connect ((_, state) => refresh (channel.to_state (state.backend_state)));
 		new Thread<void> ("sid", () => {
-			for (uint i = 95; i < 9999999; i++) {
+			for (uint8 i = 95; i < uint8.MAX; i++) {
 				Idle.add (() => { refresh (ReleaseState () { internal = ReleaseInternal () {}, process = ReleaseProcess () { progress = i, message = "%u".printf (i) } }); return Source.CONTINUE; }, Priority.DEFAULT_IDLE);
 				Thread.usleep (600000);
 			}

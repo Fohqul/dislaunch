@@ -15,7 +15,7 @@ public struct ReleaseInternal {
 public struct ReleaseProcess {
 	string status;
 	string message;
-	uint progress; // not a `uint8` because I can't be asked to deal with JSON parsing bs
+	uint8 progress;
 	string error;
 }
 
@@ -210,7 +210,10 @@ class Socket {
 			// try {
 			state.process.status = parse_value (process_object.get_member ("status"), Type.STRING).get_string ();
 			state.process.message = parse_value (process_object.get_member ("message"), Type.STRING).get_string ();
-			state.process.progress = parse_value (process_object.get_member ("progress"), Type.UINT).get_uint ();
+			var progress = parse_value (process_object.get_member ("progress"), Type.INT64).get_int64 ();
+			if (progress < uint8.MIN || progress > uint8.MAX)
+				throw new SocketError.INVALID_RESPONSE ("`progress` is not a valid uint8");
+			state.process.progress = (uint8) progress;
 			state.process.error = parse_value (process_object.get_member ("error"), Type.STRING).get_string ();
 			// } catch (Error e) {
 			// critical = e;
