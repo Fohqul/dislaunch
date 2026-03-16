@@ -173,7 +173,13 @@ func (release *Release) openGob(flag int) (*os.File, func()) {
 	}
 }
 
-func (release *Release) setInternal(internal releaseInternal) error {
+func (release *Release) setInternal(internal *releaseInternal) error {
+	if internal == nil {
+		err := fmt.Errorf("internal is nil")
+		fmt.Fprintln(os.Stderr, err)
+		return err
+	}
+
 	file, close := release.openGob(os.O_WRONLY)
 	if file == nil || close == nil {
 		return fmt.Errorf("error opening gob")
@@ -243,6 +249,23 @@ func (release *Release) getVersion() (string, error) {
 		return "", release.err
 	}
 	return buildInfo.Version, nil
+}
+
+func (release *Release) takeOver() (*releaseInternal, func()) {
+	release.mu.Lock()
+
+	if release.status == statusFatal {
+		return nil, nil
+	}
+
+	if internal, err := release.getInternal(); err == nil {
+		return &internal, func() {
+			release.resetState()
+			release.mu.Unlock()
+		}
+	}
+
+	return nil, nil
 }
 
 type releaseProcessView struct {
@@ -331,34 +354,22 @@ func (release *Release) GetState() *ReleaseState {
 }
 
 func (release *Release) SetCommandLineArguments(commandLineArguments string) {
-	release.mu.Lock()
-	defer release.mu.Unlock()
-
-	if release.status == statusFatal {
+	internal, reset := release.takeOver()
+	if internal == nil || reset == nil {
 		return
 	}
-
-	internal, err := release.getInternal()
-	if err != nil {
-		return
-	}
+	defer reset()
 
 	internal.CommandLineArguments = commandLineArguments
 	release.setInternal(internal)
 }
 
 func (release *Release) SetBdEnabled(bdEnabled bool) {
-	release.mu.Lock()
-	defer release.mu.Unlock()
-
-	if release.status == statusFatal {
+	internal, reset := release.takeOver()
+	if internal == nil || reset == nil {
 		return
 	}
-
-	internal, err := release.getInternal()
-	if err != nil {
-		return
-	}
+	defer reset()
 
 	internal.BdEnabled = bdEnabled
 	if release.setInternal(internal) != nil {
@@ -373,17 +384,11 @@ func (release *Release) SetBdEnabled(bdEnabled bool) {
 }
 
 func (release *Release) SetBdChannel(bdChannel BdChannel) {
-	release.mu.Lock()
-	defer release.mu.Unlock()
-
-	if release.status == statusFatal {
+	internal, reset := release.takeOver()
+	if internal == nil || reset == nil {
 		return
 	}
-
-	internal, err := release.getInternal()
-	if err != nil {
-		return
-	}
+	defer reset()
 
 	internal.BdChannel = bdChannel
 	if release.setInternal(internal) != nil {
@@ -396,19 +401,11 @@ func (release *Release) SetBdChannel(bdChannel BdChannel) {
 }
 
 func (release *Release) CheckForUpdates() {
-	release.mu.Lock()
-	defer release.mu.Unlock()
-
-	if release.status == statusFatal {
+	internal, reset := release.takeOver()
+	if internal == nil || reset == nil {
 		return
 	}
-
-	internal, err := release.getInternal()
-	if err != nil {
-		return
-	}
-
-	defer release.resetState()
+	defer reset()
 
 	release.status = statusUpdateCheck
 	release.message = "Checking for updates"
@@ -438,6 +435,7 @@ func (release *Release) CheckForUpdates() {
 }
 
 func (release *Release) Install() {
+	// can't use `takeOver` because it fails if not installed
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
@@ -631,7 +629,7 @@ func (release *Release) Install() {
 	}
 
 	if !installed {
-		release.setInternal(releaseInternal{
+		release.setInternal(&releaseInternal{
 			InstallPath: installPath,
 			LastChecked: time.Now(), // todo this is silly if we're using a cached tarball and signals that whether a release is installed should not be determined by the presence of its gob/internal data
 			BdChannel:   BdStable,
@@ -640,53 +638,33 @@ func (release *Release) Install() {
 }
 
 func (release *Release) uninjectBd() {
-	release.mu.Lock()
-	defer release.mu.Unlock()
-
-	if release.status == statusFatal {
+	internal, reset := release.takeOver()
+	if internal == nil || reset == nil {
 		return
 	}
-
-	_, err := release.getInternal()
-	if err != nil {
-		return
-	}
+	defer reset()
 
 	// TODO
 }
 
 func (release *Release) injectBd() {
-	release.mu.Lock()
-	defer release.mu.Unlock()
-
-	if release.status == statusFatal {
+	internal, reset := release.takeOver()
+	if internal == nil || reset == nil {
 		return
 	}
-
-	_, err := release.getInternal()
-	if err != nil {
-		return
-	}
+	defer reset()
 
 	// TODO
 }
 
 func (release *Release) Move(path string) {
-	release.mu.Lock()
-	defer release.mu.Unlock()
-
-	if release.status == statusFatal {
+	internal, reset := release.takeOver()
+	if internal == nil || reset == nil {
 		return
 	}
+	defer reset()
 
-	internal, err := release.getInternal()
-	if err != nil {
-		return
-	}
-
-	defer release.resetState()
-
-	err = os.Rename(internal.InstallPath, path)
+	err := os.Rename(internal.InstallPath, path)
 	if err == nil {
 		internal.InstallPath = path
 		release.setInternal(internal)
@@ -715,19 +693,11 @@ func (release *Release) Move(path string) {
 }
 
 func (release *Release) Uninstall() {
-	release.mu.Lock()
-	defer release.mu.Unlock()
-
-	if release.status == statusFatal {
+	internal, reset := release.takeOver()
+	if internal == nil || reset == nil {
 		return
 	}
-
-	internal, err := release.getInternal()
-	if err != nil {
-		return
-	}
-
-	defer release.resetState()
+	defer reset()
 
 	release.status = statusUninstall
 	release.message = "Deleting " + internal.InstallPath
@@ -736,7 +706,7 @@ func (release *Release) Uninstall() {
 
 	// Scary!
 	// todo perhaps consider some safeguards to prevent deleting critical directories?
-	if err = os.RemoveAll(internal.InstallPath); err != nil {
+	if err := os.RemoveAll(internal.InstallPath); err != nil {
 		fmt.Fprintf(os.Stderr, "error uninstalling release '%s' from '%s': %s\n", release, internal.InstallPath, err)
 		release.status = statusFatal
 		release.message = "Failed to uninstall"
