@@ -148,7 +148,7 @@ class Release : Gtk.Box {
 			update_row.title = "Installed version: " + state.version;
 			update_button.label = "Check for updates";
 		}
-		update_row.subtitle = state.internal.last_checked != "0001-01-01T00:00:00Z" ? new DateTime.from_iso8601 (state.internal.last_checked, null).format ("Last checked: %Y-%m-%d %H:%M:%S") : "";
+		update_row.subtitle = state.internal.last_checked.to_unix () != 0 ? state.internal.last_checked.format ("Last checked: %Y-%m-%d %H:%M:%S") : "";
 		install_path_row.text = state.internal.install_path;
 		command_line_arguments_row.text = state.internal.command_line_arguments;
 

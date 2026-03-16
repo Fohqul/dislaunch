@@ -5,7 +5,7 @@
 
 public struct ReleaseInternal {
 	string install_path;
-	string last_checked;
+	DateTime last_checked;
 	string latest_version;
 	string command_line_arguments;
 	bool bd_enabled;
@@ -184,11 +184,17 @@ class Socket {
 			var internal_object = release_internal.get_object ();
 			// try {
 			state.internal.install_path = parse_value (internal_object.get_member ("install_path"), Type.STRING).get_string ();
-			state.internal.last_checked = parse_value (internal_object.get_member ("last_checked"), Type.STRING).get_string ();
+			var last_checked = parse_value (internal_object.get_member ("last_checked"), Type.STRING).get_string ();
+			state.internal.last_checked = new DateTime.from_iso8601 (last_checked, null);
+			if (state.internal.last_checked == null)
+				throw new SocketError.INVALID_RESPONSE ("`last_checked` is not a valid DateTime: %s", last_checked);
 			state.internal.latest_version = parse_value (internal_object.get_member ("latest_version"), Type.STRING).get_string ();
 			state.internal.command_line_arguments = parse_value (internal_object.get_member ("command_line_arguments"), Type.STRING).get_string ();
 			state.internal.bd_enabled = parse_value (internal_object.get_member ("bd_enabled"), Type.BOOLEAN).get_boolean ();
-			state.internal.bd_channel = parse_value (internal_object.get_member ("bd_channel"), Type.STRING).get_string ();
+			var bd_channel = parse_value (internal_object.get_member ("bd_channel"), Type.STRING).get_string ();
+			if (bd_channel != "stable" && bd_channel != "canary")
+				throw new SocketError.INVALID_RESPONSE ("invalid BetterDiscord channel: %s", bd_channel);
+			state.internal.bd_channel = bd_channel;
 			// } catch (Error e) {
 			// critical = e;
 			// }
