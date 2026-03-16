@@ -148,7 +148,7 @@ class Application : Adw.Application {
 		view_stack.add_named (waiting_page, "waiting");
 
 		critical_page = new Adw.StatusPage () {
-			title = "Couldn't connect to backend",
+			title = "Socket Error",
 			icon_name = "dialog-error"
 		};
 		view_stack.add_named (critical_page, "critical");
