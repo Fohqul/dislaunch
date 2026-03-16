@@ -124,6 +124,20 @@ func (release *Release) String() string {
 	return ""
 }
 
+func (release *Release) pathName() string {
+	switch release {
+	case &Stable:
+		return "Discord"
+	case &PTB:
+		return "DiscordPTB"
+	case &Canary:
+		return "DiscordCanary"
+	}
+
+	log.Fatalf("unknown release: %p\n", release)
+	return ""
+}
+
 func (release *Release) getGobPath() string {
 	return filepath.Join(GetHomeXDGDirectory("XDG_STATE_HOME", filepath.Join(".local", "state")), release.String()+".gob")
 }
@@ -229,7 +243,7 @@ func (release *Release) getVersion() (string, error) {
 		return "", err
 	}
 
-	file, err := os.Open(filepath.Join(internal.InstallPath, "resources", "build_info.json"))
+	file, err := os.Open(filepath.Join(internal.InstallPath, release.pathName(), "resources", "build_info.json"))
 	if err != nil {
 		return "", err
 	}
@@ -521,36 +535,38 @@ func (release *Release) Install() {
 			installPath = GetDataHome()
 		}
 	}
-	installRealpath, err := filepath.EvalSymlinks(installPath)
-	if err != nil {
-		release.err = fmt.Errorf("error getting realpath of install path '%s': %w", internal.InstallPath, err)
-		release.updateState()
-		return
-	}
-	processes, err := process.Processes()
-	if err != nil {
-		release.err = fmt.Errorf("error getting running processes: %w", err)
-		release.updateState()
-		return
-	}
-	for _, process := range processes {
-		exe, err := process.Exe()
+	if installed {
+		installRealpath, err := filepath.EvalSymlinks(filepath.Join(installPath, release.pathName()))
 		if err != nil {
-			release.err = fmt.Errorf("error getting executable of running process: %w", err)
+			release.err = fmt.Errorf("error getting realpath of install path '%s': %w", filepath.Join(installRealpath, release.pathName()), err)
 			release.updateState()
-			continue
-		}
-
-		exeRealpath, err := filepath.EvalSymlinks(exe)
-		if err != nil {
-			release.err = fmt.Errorf("error getting realpath of executable '%s': %w", exe, err)
-			release.updateState()
-			continue
-		}
-
-		if strings.HasPrefix(exeRealpath, installRealpath) {
-			log.Println("Release '", release, "' is currently running - skipping install")
 			return
+		}
+		processes, err := process.Processes()
+		if err != nil {
+			release.err = fmt.Errorf("error getting running processes: %w", err)
+			release.updateState()
+			return
+		}
+		for _, process := range processes {
+			exe, err := process.Exe()
+			if err != nil {
+				release.err = fmt.Errorf("error getting executable of running process: %w", err)
+				release.updateState()
+				continue
+			}
+
+			exeRealpath, err := filepath.EvalSymlinks(exe)
+			if err != nil {
+				release.err = fmt.Errorf("error getting realpath of executable '%s': %w", exe, err)
+				release.updateState()
+				continue
+			}
+
+			if strings.HasPrefix(exeRealpath, installRealpath) {
+				log.Println("Release '", release, "' is currently running - skipping install")
+				return
+			}
 		}
 	}
 
@@ -566,12 +582,11 @@ func (release *Release) Install() {
 		Extraction:  archives.Tar{},
 		Compression: archives.Gz{},
 	}
-	path := filepath.Join(installRealpath, release.String())
 	if err = format.Extract(context.Background(), tarball, func(_ context.Context, info archives.FileInfo) error {
 		release.message = "Extracting " + info.NameInArchive
 
 		if info.IsDir() {
-			if err = os.MkdirAll(filepath.Join(path, info.NameInArchive), info.Mode().Perm()); err != nil {
+			if err = os.MkdirAll(filepath.Join(installPath, info.NameInArchive), info.Mode().Perm()); err != nil {
 				release.err = fmt.Errorf("error creating extracted directory '%s': %w", info.NameInArchive, err)
 				release.updateState()
 				return err
@@ -584,9 +599,9 @@ func (release *Release) Install() {
 				return err
 			}
 
-			destination, err := os.OpenFile(filepath.Join(path, info.NameInArchive), os.O_CREATE|os.O_WRONLY, info.Mode().Perm())
+			destination, err := os.OpenFile(filepath.Join(installPath, info.NameInArchive), os.O_CREATE|os.O_WRONLY, info.Mode().Perm())
 			if err != nil {
-				release.err = fmt.Errorf("error opening destination file '%s': %w", path+info.NameInArchive, err)
+				release.err = fmt.Errorf("error opening destination file '%s': %w", filepath.Join(installPath, info.NameInArchive), err)
 				release.updateState()
 				return err
 			}
@@ -664,7 +679,10 @@ func (release *Release) Move(path string) {
 	}
 	defer reset()
 
-	err := os.Rename(internal.InstallPath, path)
+	oldPath := filepath.Join(internal.InstallPath, release.pathName())
+	newPath := filepath.Join(path, release.pathName())
+
+	err := os.Rename(oldPath, newPath)
 	if err == nil {
 		internal.InstallPath = path
 		release.setInternal(internal)
@@ -677,14 +695,14 @@ func (release *Release) Move(path string) {
 		return
 	}
 
-	if err = cp.Copy(internal.InstallPath, path, cp.Options{Sync: true, PreserveTimes: true, PreserveOwner: true}); err != nil {
+	if err = cp.Copy(oldPath, newPath, cp.Options{Sync: true, PreserveTimes: true, PreserveOwner: true}); err != nil {
 		release.err = fmt.Errorf("error copying release '%s' to '%s': %w", release, path, err)
 		release.updateState()
 		return
 	}
 
-	if err = os.RemoveAll(internal.InstallPath); err != nil {
-		release.err = fmt.Errorf("error removing previous install path '%s': %w", internal.InstallPath, err)
+	if err = os.RemoveAll(oldPath); err != nil {
+		release.err = fmt.Errorf("error removing previous install path '%s': %w", oldPath, err)
 		release.updateState()
 	}
 
@@ -699,14 +717,16 @@ func (release *Release) Uninstall() {
 	}
 	defer reset()
 
+	path := filepath.Join(internal.InstallPath, release.pathName())
+
 	release.status = statusUninstall
-	release.message = "Deleting " + internal.InstallPath
+	release.message = "Deleting " + path
 	release.progress = 101
 	release.updateState()
 
 	// Scary!
 	// todo perhaps consider some safeguards to prevent deleting critical directories?
-	if err := os.RemoveAll(internal.InstallPath); err != nil {
+	if err := os.RemoveAll(path); err != nil {
 		fmt.Fprintf(os.Stderr, "error uninstalling release '%s' from '%s': %s\n", release, internal.InstallPath, err)
 		release.status = statusFatal
 		release.message = "Failed to uninstall"
