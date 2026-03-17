@@ -75,9 +75,9 @@ func setConfiguration(configuration Configuration) error {
 		fmt.Fprintf(os.Stderr, "error encoding configuration: %s\n", err)
 		return err // todo should this be fatal?
 	}
-	close() // have to close because `BroadcastBackendState` calls `GetConfiguration`, which also takes the lock, causing a deadlock
+	close()
 
-	BroadcastBackendState()
+	go BroadcastBackendState()
 
 	return nil
 }

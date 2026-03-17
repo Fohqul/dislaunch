@@ -135,7 +135,7 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 				case "default_install_path":
 					if err = SetDefaultInstallPath(command[2]); err != nil {
 						fmt.Fprintf(os.Stderr, "error setting default installation path: %s\n", err)
-						BroadcastBackendState() // if `SetDefaultInstallPath` fails, `setConfiguration` never runs and therefore `BroadcastBackendState` never runs
+						go BroadcastBackendState() // if `SetDefaultInstallPath` fails, `setConfiguration` never runs and therefore `BroadcastBackendState` never runs
 					}
 				default:
 					fmt.Fprintf(os.Stderr, "unknown configuration option: %s\n", command[1])
