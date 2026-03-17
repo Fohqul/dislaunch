@@ -34,10 +34,7 @@ class ProgressBar : Gtk.Widget {
 		progress_bar.set_parent (this);
 
 		Timeout.add (200, () => {
-			if (!visible)
-				return Source.CONTINUE;
-
-			if (progress > 100)
+			if (visible && progress > 100)
 				progress_bar.pulse ();
 
 			return Source.CONTINUE;
