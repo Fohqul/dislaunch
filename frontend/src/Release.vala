@@ -89,7 +89,6 @@ class Release : Gtk.Box {
 		bd_enabled_row.add_row (bd_channel_row);
 
 		var bd_apply_row = new Adw.ActionRow ();
-		bd_preferences_group.add (bd_apply_row);
 
 		var bd_apply_button = new Gtk.Button () { label = "Apply", valign = Gtk.Align.CENTER };
 		bd_apply_button.add_css_class ("suggested-action");
@@ -101,6 +100,7 @@ class Release : Gtk.Box {
 		bd_apply_row.add_suffix (bd_apply_button);
 
 		bd_apply_progress_row = new ProgressRow (bd_apply_row);
+		bd_preferences_group.add (bd_apply_progress_row);
 
 		view_stack.visible_child_name = "preferences";
 		Socket.instance.state_sig.connect ((_, state) => Idle.add (() => {
