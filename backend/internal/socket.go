@@ -209,10 +209,7 @@ func StartListener() (func(), error) {
 	container.connections = make(map[net.Conn]*connectionEntry)
 
 	go func() {
-		for {
-			if listener == nil {
-				return
-			}
+		for listener != nil {
 			conn, err := listener.Accept()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error accepting connection: %s\n", err)
