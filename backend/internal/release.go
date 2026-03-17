@@ -653,26 +653,6 @@ func (release *Release) Install() {
 	}
 }
 
-func (release *Release) uninjectBd() {
-	internal, reset := release.takeOver()
-	if internal == nil || reset == nil {
-		return
-	}
-	defer reset()
-
-	// TODO
-}
-
-func (release *Release) injectBd() {
-	internal, reset := release.takeOver()
-	if internal == nil || reset == nil {
-		return
-	}
-	defer reset()
-
-	// TODO
-}
-
 func (release *Release) Move(path string) {
 	internal, reset := release.takeOver()
 	if internal == nil || reset == nil {
@@ -739,4 +719,24 @@ func (release *Release) Uninstall() {
 		release.err = err
 	}
 	release.updateState()
+}
+
+func (release *Release) injectBd() {
+	internal, reset := release.takeOver()
+	if internal == nil || reset == nil {
+		return
+	}
+	defer reset()
+
+	// TODO
+}
+
+func (release *Release) uninjectBd() {
+	internal, reset := release.takeOver()
+	if internal == nil || reset == nil {
+		return
+	}
+	defer reset()
+
+	// TODO
 }
