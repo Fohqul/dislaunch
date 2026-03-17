@@ -45,10 +45,18 @@ func setBoolean(set func(bool), setting string) {
 func releaseCommand(release *Release, data string, command []string) {
 	switch command[1] {
 	case "bd_enabled":
+		if len(command) < 3 {
+			fmt.Fprintln(os.Stderr, "setting required for BetterDiscord enabled")
+			return
+		}
 		setBoolean(func(enabled bool) {
 			go release.SetBdEnabled(enabled)
 		}, command[2])
 	case "bd_channel":
+		if len(command) < 3 {
+			fmt.Fprintln(os.Stderr, "setting required for BetterDiscord channel")
+			return
+		}
 		switch command[2] {
 		case "stable":
 			go release.SetBdChannel(BdStable)
@@ -65,6 +73,10 @@ func releaseCommand(release *Release, data string, command []string) {
 	case "install":
 		go release.Install()
 	case "move":
+		if len(command) < 3 {
+			fmt.Fprintln(os.Stderr, "path required to move release")
+			return
+		}
 		go release.Move(command[2])
 	case "uninstall":
 		go release.Uninstall()
@@ -108,6 +120,10 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 			case "canary":
 				go releaseCommand(&Canary, data, command)
 			case "config":
+				if len(command) < 3 {
+					fmt.Fprintln(os.Stderr, "setting required for configuration option")
+					return
+				}
 				// i should be taken out back for nesting switch statements like this. there is certainly a better way of handling commands/subcommands/arguments
 				switch command[1] {
 				case "automatically_check_for_updates":
