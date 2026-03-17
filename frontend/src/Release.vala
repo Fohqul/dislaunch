@@ -33,7 +33,7 @@ class Release : Gtk.Box {
 		update_progress_row = new ProgressRow (update_row);
 		main_preferences_group.add (update_progress_row);
 
-		update_button = new Gtk.Button () { label = "Loading…" };
+		update_button = new Gtk.Button () { label = "Loading…", valign = Gtk.Align.CENTER };
 		update_button.clicked.connect ((button) => Socket.command (channel.id + (button.label == "Update" ? " install" : " check_for_updates"))); // somewhat hacky to determine state using direct properties but oh well
 		update_row.add_suffix (update_button);
 
