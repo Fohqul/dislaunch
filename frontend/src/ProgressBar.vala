@@ -21,7 +21,10 @@ class ProgressBar : Gtk.Widget {
 			_progress = value;
 			visible = true;
 			if (value < 101)
-				progress_bar.fraction = value / 100.0;
+				Idle.add (() => {
+					progress_bar.fraction = value / 100.0;
+					return Source.REMOVE;
+				});
 		}
 	}
 
