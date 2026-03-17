@@ -187,6 +187,27 @@ func (release *Release) openGob(flag int) (*os.File, func()) {
 	}
 }
 
+func (release *Release) getInternal() (releaseInternal, error) {
+	if !release.isInstalled() {
+		return releaseInternal{}, fmt.Errorf("release '%s' is not installed", release)
+	}
+
+	file, close := release.openGob(os.O_RDONLY)
+	if file == nil || close == nil {
+		return releaseInternal{}, fmt.Errorf("error opening gob")
+	}
+	defer close()
+
+	var internal releaseInternal
+	if err := gob.NewDecoder(file).Decode(&internal); err != nil {
+		release.status = statusFatal
+		release.message = "Failed to decode internal data"
+		release.err = err
+		return releaseInternal{}, err
+	}
+	return internal, nil
+}
+
 func (release *Release) setInternal(internal *releaseInternal) error {
 	if internal == nil {
 		err := fmt.Errorf("internal is nil")
@@ -208,27 +229,6 @@ func (release *Release) setInternal(internal *releaseInternal) error {
 		return err
 	}
 	return nil
-}
-
-func (release *Release) getInternal() (releaseInternal, error) {
-	if !release.isInstalled() {
-		return releaseInternal{}, fmt.Errorf("release '%s' is not installed", release)
-	}
-
-	file, close := release.openGob(os.O_RDONLY)
-	if file == nil || close == nil {
-		return releaseInternal{}, fmt.Errorf("error opening gob")
-	}
-	defer close()
-
-	var internal releaseInternal
-	if err := gob.NewDecoder(file).Decode(&internal); err != nil {
-		release.status = statusFatal
-		release.message = "Failed to decode internal data"
-		release.err = err
-		return releaseInternal{}, err
-	}
-	return internal, nil
 }
 
 /**
