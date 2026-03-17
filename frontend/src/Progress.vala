@@ -106,7 +106,7 @@ class Progress : Adw.Application {
 
 		view_stack.add_named (SuspensePageFactory.create ("Launching…"), "suspense");
 
-		view_stack.add_named (InstallPageFactory.create (channel), "install");
+		view_stack.add_named (new InstallPage (channel), "install");
 
 		var container = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
 		container.add_css_class ("container");
@@ -157,7 +157,7 @@ class Progress : Adw.Application {
 		// Socket.instance.state_sig.connect ((_, state) => refresh (channel.to_state (state.backend_state)));
 		new Thread<void> ("sid", () => {
 			for (uint8 i = 95; i < uint8.MAX; i++) {
-				Idle.add (() => { refresh (ReleaseState () { internal = ReleaseInternal () {}, process = ReleaseProcess () { progress = i, message = "%u".printf (i) } }); return Source.CONTINUE; }, Priority.DEFAULT_IDLE);
+				Idle.add (() => { refresh (ReleaseState () { internal = ReleaseInternal () {}, process = ReleaseProcess () { progress = i, message = "%u".printf (i) } }); return Source.CONTINUE; });
 				Thread.usleep (600000);
 			}
 		});

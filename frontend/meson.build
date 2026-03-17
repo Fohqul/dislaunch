@@ -6,7 +6,7 @@ executable(
 		'src/Css.vala',
 		'src/FolderEntryRow.vala',
 		'src/Gui.vala',
-		'src/InstallPageFactory.vala',
+		'src/InstallPage.vala',
 		'src/Progress.vala',
 		'src/ProgressBar.vala',
 		'src/ProgressRow.vala',

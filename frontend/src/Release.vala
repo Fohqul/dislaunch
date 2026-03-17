@@ -21,7 +21,7 @@ class Release : Gtk.Box {
 		view_stack = new Adw.ViewStack ();
 		append (view_stack);
 
-		view_stack.add_named (InstallPageFactory.create (channel), "install");
+		view_stack.add_named (new InstallPage (channel), "install");
 
 		var preferences_page = new Adw.PreferencesPage ();
 		view_stack.add_named (preferences_page, "preferences");
@@ -104,7 +104,7 @@ class Release : Gtk.Box {
 	}
 
 	private void refresh (ReleaseState? state) {
-		if (state == null) {
+		if (state == null || state.internal == null) {
 			view_stack.visible_child_name = "install";
 			return;
 		}
