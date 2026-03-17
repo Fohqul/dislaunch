@@ -41,8 +41,11 @@ class Release : Gtk.Box {
 		install_path_progress_row = new ProgressRow (install_path_row);
 		main_preferences_group.add (install_path_progress_row);
 
-		command_line_arguments_row = new Adw.EntryRow () { title = "Command-Line Arguments" };
-		command_line_arguments_row.changed.connect ((row) => Socket.command ("%s command_line_arguments %s".printf (channel.id, row.text)));
+		// An apply button must be used here because when we connect to `changed`,
+		// the backend and frontend get stuck in an endless loop, setting each others'
+		// stale state
+		command_line_arguments_row = new Adw.EntryRow () { title = "Command-Line Arguments", show_apply_button = true };
+		command_line_arguments_row.apply.connect ((row) => Socket.command ("%s command_line_arguments %s".printf (channel.id, row.text)));
 		main_preferences_group.add (command_line_arguments_row);
 
 		var uninstall_row = new Adw.ActionRow ();
@@ -150,7 +153,10 @@ class Release : Gtk.Box {
 		}
 		update_row.subtitle = state.internal.last_checked.to_unix () != 0 ? state.internal.last_checked.format ("Last checked: %Y-%m-%d %H:%M:%S") : "";
 		install_path_row.text = state.internal.install_path;
-		command_line_arguments_row.text = state.internal.command_line_arguments;
+		// Checks whether values are different, because otherwise the `Adw.EntryRow`
+		// always thinks the text has changed, and therefore keeps the apply button shown
+		if (command_line_arguments_row.text != state.internal.command_line_arguments)
+			command_line_arguments_row.text = state.internal.command_line_arguments;
 
 		bd_enabled_row.expanded = state.internal.bd_enabled;
 		bd_enabled_switch.state = state.internal.bd_enabled;
