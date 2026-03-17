@@ -177,7 +177,10 @@ class Application : Adw.Application {
 		view_stack.visible_child_name = "waiting";
 		refresh ({ {}, "Starting", null, null });
 		application_window.present ();
-		Socket.instance.state_sig.connect ((_, state) => refresh (state));
+		Socket.instance.state_sig.connect ((_, state) => Idle.add (() => {
+			refresh (state);
+			return Source.REMOVE;
+		}));
 		Socket.start ();
 		Socket.command ("state");
 	}
