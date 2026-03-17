@@ -144,7 +144,7 @@ class Release : Gtk.Box {
 			}
 		}
 
-		if (state.version != state.internal.latest_version) {
+		if (state.version != state.internal.latest_version && state.internal.latest_version != "") {
 			update_row.title = "Installed version: %s (update available to %s)".printf (state.version, state.internal.latest_version);
 			update_button.label = "Update";
 		} else {
