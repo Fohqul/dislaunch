@@ -61,7 +61,7 @@ func releaseCommand(release *Release, data string, command []string) {
 		go release.CheckForUpdates()
 	case "command_line_arguments":
 		// Use a slice directly from `data` so the raw arguments are kept as-is and not lost from `string.Fields`
-		go release.SetCommandLineArguments(data[len(release.String()+" command_line_arguments "):])
+		go release.SetCommandLineArguments(data[len(release.String()+" command_line_arguments ") : len(data)-1])
 	case "install":
 		go release.Install()
 	case "move":
