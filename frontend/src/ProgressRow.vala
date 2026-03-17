@@ -6,6 +6,7 @@ class ProgressRow : Adw.PreferencesRow {
 
 		var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
 		child = box;
+		preferences_row.unparent (); // HACK: `preferences_row` is parented for some reason, which makes `box.append` fail
 		box.append (preferences_row);
 
 		progress_bar = new ProgressBar ();
