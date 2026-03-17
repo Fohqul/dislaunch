@@ -43,7 +43,7 @@ class ConfigurationPage : Adw.PreferencesPage {
 
 		default_install_path_row = new FolderEntryRow (application_window, File.new_build_filename (Environment.get_user_data_dir (), "io.github.Fohqul.Dislaunch"), (path) => Socket.command ("config default_install_path " + path)) {
 			title = "Default install path",
-			tooltip_text = "Only applies to new installations. For an already installed release, change its path from the main dashboard."
+			tooltip_text = "Defaults to $XDG_DATA_HOME/io.github.Fohqul.Dislaunch if empty.\n\nOnly applies to new installations. For an already installed release, change its path from the main dashboard."
 		};
 		preferences_group.add (default_install_path_row);
 
