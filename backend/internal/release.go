@@ -608,16 +608,17 @@ func (release *Release) Install() {
 
 			buffer := make([]byte, 32*1024)
 			accumulated := 0
-			for {
+			finished := false
+			for !finished {
 				n, err := source.Read(buffer)
 				if err != nil {
-					if err == io.EOF {
-						break
+					if err != io.EOF {
+						release.err = fmt.Errorf("error reading extracted file '%s': %w", info.NameInArchive, err)
+						release.updateState()
+						return err
 					}
 
-					release.err = fmt.Errorf("error reading extracted file '%s': %w", info.NameInArchive, err)
-					release.updateState()
-					return err
+					finished = true
 				}
 				accumulated += n
 				release.progress = uint8(float64(accumulated) / float64(info.Size()) * 100)
