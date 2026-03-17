@@ -663,6 +663,11 @@ func (release *Release) Move(path string) {
 	oldPath := filepath.Join(internal.InstallPath, release.pathName())
 	newPath := filepath.Join(path, release.pathName())
 
+	release.status = statusMove
+	release.message = "Moving to " + newPath
+	release.progress = 101
+	release.updateState()
+
 	err := os.Rename(oldPath, newPath)
 	if err == nil {
 		internal.InstallPath = path
@@ -676,7 +681,22 @@ func (release *Release) Move(path string) {
 		return
 	}
 
-	if err = cp.Copy(oldPath, newPath, cp.Options{Sync: true, PreserveTimes: true, PreserveOwner: true}); err != nil {
+	if err = cp.Copy(oldPath, newPath, cp.Options{
+		Sync:          true,
+		PreserveTimes: true,
+		PreserveOwner: true,
+		// HACK: Because we need to report status to the frontend,
+		// we need to run a callback for each file/directory.
+		// The closest this package gives us is this `Skip`
+		// callback which obviously isn't meant for this,
+		// but if it works, it works.
+		Skip: func(_ os.FileInfo, _ string, dest string) (bool, error) {
+			release.message = "Copying to " + dest
+			release.updateState()
+			// Don't skip, literally the only point of this is status reporting
+			return false, nil
+		},
+	}); err != nil {
 		release.err = fmt.Errorf("error copying release '%s' to '%s': %w", release, path, err)
 		release.updateState()
 		return
