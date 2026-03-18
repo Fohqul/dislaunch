@@ -47,7 +47,5 @@ class InstallPage : Adw.Bin {
 		status_page.paintable = spinner_paintable;
 		status_page.child = progress_bar;
 		progress_bar.progress = state.process.progress;
-		progress_bar.progress_bar.show_text = true;
-		progress_bar.progress_bar.text = "%u%%".printf(state.process.progress);
 	}
 }

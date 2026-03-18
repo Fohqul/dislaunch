@@ -215,12 +215,6 @@ class Progress : Adw.Application {
 		}
 
 		progress_bar.progress = state.process.progress;
-		if (state.process.progress < 101) {
-			progress_bar.progress_bar.show_text = true;
-			progress_bar.progress_bar.text = "%u%%".printf (state.process.progress);
-		} else
-			progress_bar.progress_bar.show_text = false;
-
 
 		if (should_append_message (state.process.message))
 			messages.append (new Gtk.StringObject (state.process.message));

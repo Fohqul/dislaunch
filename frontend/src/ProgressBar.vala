@@ -20,31 +20,53 @@ class ProgressBar : Gtk.Widget {
 		set {
 			_progress = value;
 			visible = true;
-			if (value < 101)
-				Idle.add (() => {
+			Idle.add(() => {
+				update_text();
+				if (value < 101)
 					progress_bar.fraction = value / 100.0;
-					return Source.REMOVE;
-				});
+				return Source.REMOVE;
+			});
 		}
 	}
 
-	public ProgressBar () {
-		Object ();
+	private string _text = "";
+	public string text {
+		get {
+			return _text;
+		}
+		set {
+			_text = value;
+			Idle.add(() => {
+				update_text();
+				return Source.REMOVE;
+			});
+		}
+	}
 
-		Css.add (css, Gtk.STYLE_PROVIDER_PRIORITY_USER);
+	public ProgressBar() {
+		Object();
 
-		progress_bar = new Gtk.ProgressBar ();
-		progress_bar.set_parent (this);
+		Css.add(css, Gtk.STYLE_PROVIDER_PRIORITY_USER);
 
-		Timeout.add (200, () => {
+		progress_bar = new Gtk.ProgressBar() { show_text = true };
+		progress_bar.set_parent(this);
+
+		Timeout.add(200, () => {
 			if (visible && progress > 100)
-				progress_bar.pulse ();
+				progress_bar.pulse();
 
 			return Source.CONTINUE;
 		});
 	}
 
 	static construct {
-		set_layout_manager_type (typeof (Gtk.BinLayout));
+		set_layout_manager_type(typeof (Gtk.BinLayout));
+	}
+
+	private void update_text() {
+		if (progress < 101)
+			progress_bar.text = text != "" ? "%s\n%u%%".printf(text, progress) : "%u%%".printf(progress);
+		else
+			progress_bar.text = text;
 	}
 }
