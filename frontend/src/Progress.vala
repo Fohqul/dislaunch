@@ -131,10 +131,7 @@ class Progress : Adw.Application {
 			Gtk.ListItem? list_item = object as Gtk.ListItem;
 			assert_nonnull (list_item);
 			Gtk.StringObject message = list_item.item as Gtk.StringObject;
-			if (message == null) {
-				stderr.printf ("invalid type");
-				return;
-			}
+			assert_nonnull (message);
 
 			Gtk.Label label = new Gtk.Label (message.string) { halign = Gtk.Align.START, valign = Gtk.Align.END };
 			if (message.string.has_prefix ("Error: "))
