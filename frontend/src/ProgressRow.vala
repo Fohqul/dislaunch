@@ -10,7 +10,6 @@ class ProgressRow : Adw.PreferencesRow {
 		box.append (preferences_row);
 
 		progress_bar = new ProgressBar ();
-		progress_bar.progress_bar.visible = false;
 		box.append (progress_bar);
 	}
 }

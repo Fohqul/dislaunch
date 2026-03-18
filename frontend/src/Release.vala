@@ -1,4 +1,10 @@
 class Release : Gtk.Box {
+	private static string css = """
+	.destructive-action, .suggested-action {
+		font-weight: bold;
+	}
+	""";
+
 	public ReleaseChannel channel { get; private set; }
 	private Adw.ViewStack view_stack;
 	private Adw.ActionRow update_row;
@@ -8,15 +14,19 @@ class Release : Gtk.Box {
 	private ProgressRow install_path_progress_row;
 	private Adw.EntryRow command_line_arguments_row;
 	private ProgressRow uninstall_progress_row;
+	private Gtk.Button uninstall_button;
 	private Gtk.StringList bd_channels;
 	private Adw.ExpanderRow bd_enabled_row;
 	private Gtk.Switch bd_enabled_switch;
 	private Adw.ComboRow bd_channel_row;
 	private ProgressRow bd_apply_progress_row;
+	private Gtk.Button bd_apply_button;
 
 	public Release (Adw.ApplicationWindow application_window, ReleaseChannel channel) {
 		Object ();
 		this.channel = channel;
+
+		Css.add (css);
 
 		view_stack = new Adw.ViewStack ();
 		append (view_stack);
@@ -50,8 +60,8 @@ class Release : Gtk.Box {
 
 		var uninstall_row = new Adw.ActionRow ();
 
-		var uninstall_button = new Gtk.Button () {
-			child = new Gtk.Label ("<b>Uninstall</b>") { use_markup = true },
+		uninstall_button = new Gtk.Button () {
+			label = "Uninstall",
 			valign = Gtk.Align.CENTER
 		};
 		uninstall_button.add_css_class ("destructive-action");
@@ -90,7 +100,7 @@ class Release : Gtk.Box {
 
 		var bd_apply_row = new Adw.ActionRow ();
 
-		var bd_apply_button = new Gtk.Button () { label = "Apply", valign = Gtk.Align.CENTER };
+		bd_apply_button = new Gtk.Button () { label = "Apply", valign = Gtk.Align.CENTER };
 		bd_apply_button.add_css_class ("suggested-action");
 		bd_apply_button.clicked.connect (() => {
 			Gtk.StringObject? string_object = bd_channels.get_item (bd_channel_row.selected) as Gtk.StringObject;
@@ -115,38 +125,6 @@ class Release : Gtk.Box {
 			return;
 		}
 
-		if (state.process != null) {
-			update_progress_row.progress_bar.visible = false;
-			install_path_progress_row.progress_bar.visible = false;
-			uninstall_progress_row.progress_bar.visible = false;
-			bd_apply_progress_row.progress_bar.visible = false;
-
-			switch (state.process.status) {
-			case "" :
-				break;
-			case "download" :
-			case "install" :
-			case "update_check" :
-				update_progress_row.progress_bar.progress = state.process.progress;
-				break;
-			case "bd_injection":
-				bd_apply_progress_row.progress_bar.progress = state.process.progress;
-				break;
-			case "move":
-				install_path_progress_row.progress_bar.progress = state.process.progress;
-				break;
-			case "uninstall":
-				uninstall_progress_row.progress_bar.progress = state.process.progress;
-				break;
-			case "fatal":
-				view_stack.visible_child_name = "recover";
-				return;
-			default:
-				stderr.printf ("Unrecognised status: %s\n", state.process.status);
-				break;
-			}
-		}
-
 		if (state.version != state.internal.latest_version && state.internal.latest_version != "") {
 			update_row.title = "Installed version: %s (update available to %s)".printf (state.version, state.internal.latest_version);
 			update_button.label = "Update";
@@ -157,25 +135,75 @@ class Release : Gtk.Box {
 			update_button.remove_css_class ("suggested-action");
 		}
 		update_row.subtitle = state.internal.last_checked.to_unix () != 0 ? state.internal.last_checked.format ("Last checked: %Y-%m-%d %H:%M:%S") : "";
-		install_path_row.text = state.internal.install_path;
+		update_progress_row.progress_bar.visible = false;
+		update_button.sensitive = true;
+
+		install_path_progress_row.progress_bar.visible = false;
 		// Checks whether values are different, because otherwise the `Adw.EntryRow`
 		// always thinks the text has changed, and therefore keeps the apply button shown
+		if (install_path_row.text != state.internal.install_path)
+			install_path_row.text = state.internal.install_path;
+
 		if (command_line_arguments_row.text != state.internal.command_line_arguments)
 			command_line_arguments_row.text = state.internal.command_line_arguments;
+
+		uninstall_progress_row.progress_bar.visible = false;
+		uninstall_button.sensitive = true;
+		uninstall_button.label = "Uninstall";
 
 		bd_enabled_row.expanded = state.internal.bd_enabled;
 		bd_enabled_switch.state = state.internal.bd_enabled;
 		bd_enabled_switch.active = state.internal.bd_enabled;
 		switch (state.internal.bd_channel) {
-		case "stable":
+		case "stable" :
 			bd_channel_row.selected = 0;
 			break;
-		case "canary":
+		case "canary" :
 			bd_channel_row.selected = 1;
 			break;
-		default:
+			default : // formatter gonna format :thumbsup:
 			assert_not_reached ();
 		}
+		bd_apply_progress_row.progress_bar.visible = false;
+		bd_apply_button.sensitive = true;
+
 		view_stack.visible_child_name = "preferences";
+
+		if (state.process == null || state.process.status == "")
+			return;
+
+
+		var text = state.process.error != "" ? "%s\n%s".printf (state.process.message, state.process.error) : state.process.message;
+
+		switch (state.process.status) {
+		case "download" :
+		case "install" :
+		case "update_check":
+			update_progress_row.progress_bar.progress = state.process.progress;
+			update_progress_row.progress_bar.text = text;
+			update_button.sensitive = false;
+			update_button.label = state.process.status == "update_check" ? "Checking…" : "Updating…";
+			break;
+		case "bd_injection":
+			bd_apply_progress_row.progress_bar.progress = state.process.progress;
+			bd_apply_progress_row.progress_bar.text = text;
+			break;
+		case "move":
+			install_path_progress_row.progress_bar.progress = state.process.progress;
+			install_path_progress_row.progress_bar.text = text;
+			break;
+		case "uninstall":
+			uninstall_progress_row.progress_bar.progress = state.process.progress;
+			uninstall_progress_row.progress_bar.text = text;
+			uninstall_button.sensitive = false;
+			uninstall_button.label = "Uninstalling…";
+			break;
+		case "fatal":
+			view_stack.visible_child_name = "recover";
+			return;
+		default:
+			stderr.printf ("Unrecognised status: %s\n", state.process.status);
+			break;
+		}
 	}
 }
