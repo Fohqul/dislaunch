@@ -12,7 +12,7 @@ int launch (ReleaseChannel channel) {
 	new Progress (channel).run ();
 	// }
 
-	string path_name = channel.title;
+	string path_name = "Discord";
 	if (channel == ReleaseChannel.PTB)
 		path_name = "DiscordPTB";
 	else if (channel == ReleaseChannel.CANARY)
