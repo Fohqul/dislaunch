@@ -9,8 +9,7 @@ int launch (ReleaseChannel channel) {
 
 	Socket.command (channel.id + " check_for_updates");
 	// if (state.version != state.internal.latest_version) {
-	Progress progress = new Progress (channel);
-	progress.run ();
+	new Progress (channel).run ();
 	// }
 
 	string path_name = channel.title;
@@ -46,10 +45,8 @@ int main (string[] args) {
 		return Posix.EXIT_FAILURE;
 	}
 
-	if (args.length == 1) {
-		Application application = new Application ();
-		return application.run (args);
-	}
+	if (args.length == 1)
+		return new Application ().run (args);
 
 	switch (args[1]) {
 	case "stable" :
