@@ -117,10 +117,8 @@ class Progress : Adw.Application {
 
 		var scrolled_window = new Gtk.ScrolledWindow () { vexpand = true };
 		scrolled_window.vadjustment.notify["upper"].connect ((object, _) => {
-			// var vadjustment = object as Gtk.Adjustment;
-			// assert_nonnull (vadjustment);
-			// vadjustment.value = double.MAX;
-			// print ("new is %f\n", vadjustment.value);
+			// todo don't scroll if user's scrolled up intentionally/manually
+			list_view.scroll_to (messages.n_items - 1, Gtk.ListScrollFlags.NONE, null);
 		});
 		container.append (scrolled_window);
 
@@ -137,9 +135,6 @@ class Progress : Adw.Application {
 			if (message.string.has_prefix ("Error: "))
 				label.add_css_class ("error");
 			list_item.child = label;
-
-			// todo fix this
-			list_view.scroll_to (messages.n_items - 1, Gtk.ListScrollFlags.NONE, null);
 		});
 
 		list_view = new Gtk.ListView (new Gtk.NoSelection (messages), signal_list_item_factory) { valign = Gtk.Align.END };
