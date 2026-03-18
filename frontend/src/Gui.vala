@@ -4,7 +4,7 @@ int launch (ReleaseChannel channel) {
 
 	// if (state == null) {
 	// stderr.printf ("Release '%s' is not installed. Please install it first.\n", channel.id);
-	// return 1;
+	// return Posix.EXIT_FAILURE;
 	// }
 
 	Socket.command (channel.id + " check_for_updates");
@@ -37,13 +37,13 @@ int launch (ReleaseChannel channel) {
 	Posix.execv (executable, argv);
 
 	stderr.printf ("Failed to launch " + channel.title + ": %s\n", strerror (errno));
-	return 1;
+	return Posix.EXIT_FAILURE;
 }
 
 int main (string[] args) {
 	if (!Thread.supported ()) {
 		stderr.printf ("Cannot run without thread support\n");
-		return 1;
+		return Posix.EXIT_FAILURE;
 	}
 
 	if (args.length == 1) {
@@ -60,6 +60,6 @@ int main (string[] args) {
 		return launch (ReleaseChannel.CANARY);
 	default:
 		stderr.printf ("Unknown argument: %s\n", args[1]);
-		return 1;
+		return Posix.EXIT_FAILURE;
 	}
 }

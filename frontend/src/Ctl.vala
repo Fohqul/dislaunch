@@ -20,7 +20,7 @@ void usage (string name) {
 int main (string[] args) {
 	if (args.length <= 1) {
 		usage (args[0]);
-		return 0;
+		return Posix.EXIT_SUCCESS;
 	}
 
 	// HACK the CLI basically just mirrors the socket API
@@ -29,5 +29,5 @@ int main (string[] args) {
 	Thread.usleep (50000);
 	Socket.command (string.joinv (" ", args[1 :]));
 
-	return 0;
+	return Posix.EXIT_SUCCESS;
 }
