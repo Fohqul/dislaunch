@@ -169,7 +169,7 @@ class Socket {
 		return node.get_value ();
 	}
 
-	private void parse_release (Json.Node release, ref ReleaseState? state) throws SocketError {
+	private void parse_release (Json.Node release, out ReleaseState? state) throws SocketError {
 		if (release.get_node_type () == Json.NodeType.NULL) {
 			state = null;
 			return;
@@ -241,9 +241,9 @@ class Socket {
 			var root_object = root.get_object ();
 			BackendState backend_state = {};
 
-			parse_release (root_object.get_member ("stable"), ref backend_state.stable);
-			parse_release (root_object.get_member ("ptb"), ref backend_state.ptb);
-			parse_release (root_object.get_member ("canary"), ref backend_state.canary);
+			parse_release (root_object.get_member ("stable"), out backend_state.stable);
+			parse_release (root_object.get_member ("ptb"), out backend_state.ptb);
+			parse_release (root_object.get_member ("canary"), out backend_state.canary);
 
 			var config = root_object.get_member ("config");
 			if (config.get_node_type () != Json.NodeType.OBJECT)
