@@ -169,7 +169,7 @@ class Release : Gtk.Box {
 
 		view_stack.visible_child_name = "preferences";
 
-		if (state.process == null || state.process.status == "")
+		if (state.process.status == "")
 			return;
 
 

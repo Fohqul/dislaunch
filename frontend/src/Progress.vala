@@ -169,9 +169,6 @@ class Progress : Adw.Application {
 			view_stack.visible_child_name = "install";
 			return;
 		}
-		if (state.process == null) {
-			return; // todo
-		}
 
 		view_stack.visible_child_name = "process";
 
