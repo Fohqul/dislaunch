@@ -165,7 +165,7 @@ class Progress : Adw.Application {
 	}
 
 	private void refresh (ReleaseState? state) {
-		if (state == null) {
+		if (state == null || state.version == "" || state.internal == null) {
 			view_stack.visible_child_name = "install";
 			return;
 		}

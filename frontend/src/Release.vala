@@ -120,7 +120,7 @@ class Release : Gtk.Box {
 	}
 
 	private void refresh (ReleaseState? state) {
-		if (state == null || state.internal == null) {
+		if (state == null || state.version == "" || state.internal == null) {
 			view_stack.visible_child_name = "install";
 			return;
 		}
