@@ -1,6 +1,6 @@
 int launch (ReleaseChannel channel) {
 	Socket.start ();
-	ReleaseState? state = channel.to_state (Socket.get_state ().backend_state);
+	var state = channel.to_state (Socket.get_state ().backend_state);
 
 	// if (state == null) {
 	// stderr.printf ("Release '%s' is not installed. Please install it first.\n", channel.id);
@@ -12,7 +12,7 @@ int launch (ReleaseChannel channel) {
 	new Progress (channel).run ();
 	// }
 
-	string path_name = "Discord";
+	var path_name = "Discord";
 	if (channel == ReleaseChannel.PTB)
 		path_name = "DiscordPTB";
 	else if (channel == ReleaseChannel.CANARY)
@@ -49,7 +49,7 @@ int main (string[] args) {
 		return new Application ().run (args);
 
 	switch (args[1]) {
-	case "stable" :
+	case "stable":
 		return launch (ReleaseChannel.STABLE);
 	case "ptb":
 		return launch (ReleaseChannel.PTB);

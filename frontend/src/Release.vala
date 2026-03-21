@@ -90,9 +90,9 @@ class Release : Gtk.Box {
 			model = bd_channels
 		};
 		bd_channel_row.notify["selected"].connect ((object, _) => {
-			Adw.ComboRow? row = object as Adw.ComboRow;
+			var row = object as Adw.ComboRow;
 			assert_nonnull (row);
-			Gtk.StringObject? string_object = bd_channels.get_item (row.selected) as Gtk.StringObject;
+			var string_object = bd_channels.get_item (row.selected) as Gtk.StringObject;
 			assert_nonnull (row);
 			Socket.command (channel.id + " bd_channel " + string_object.string.ascii_down (string_object.string.length));
 		});
@@ -103,7 +103,7 @@ class Release : Gtk.Box {
 		bd_apply_button = new Gtk.Button () { label = "Apply", valign = Gtk.Align.CENTER };
 		bd_apply_button.add_css_class ("suggested-action");
 		bd_apply_button.clicked.connect (() => {
-			Gtk.StringObject? string_object = bd_channels.get_item (bd_channel_row.selected) as Gtk.StringObject;
+			var string_object = bd_channels.get_item (bd_channel_row.selected) as Gtk.StringObject;
 			assert_nonnull (string_object);
 			Socket.command ("%s bd_channel %s\n%s bd_enabled %b".printf (channel.id, string_object.string, channel.id, bd_enabled_switch.state));
 		});
