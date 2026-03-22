@@ -598,6 +598,7 @@ func (release *Release) Install() {
 				release.updateState()
 				return err
 			}
+			defer source.Close()
 
 			destination, err := os.OpenFile(filepath.Join(installPath, info.NameInArchive), os.O_CREATE|os.O_WRONLY, info.Mode().Perm())
 			if err != nil {
@@ -605,6 +606,7 @@ func (release *Release) Install() {
 				release.updateState()
 				return err
 			}
+			defer destination.Close()
 
 			buffer := make([]byte, 32*1024)
 			accumulated := 0
