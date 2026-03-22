@@ -22,16 +22,19 @@ func GetRuntimeDirectory() string {
 }
 
 func GetHomeXDGDirectory(environment string, fallback string) string {
-	directory := os.Getenv(environment)
-	if directory == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			log.Fatalf("error getting user home directory: %s", err) // if we couldn't get the user's home directory, then the situation is so fucked we may as well crash
-		}
-		directory = filepath.Join(home, fallback)
+	if directory := os.Getenv(environment); directory != "" {
+		return directory
 	}
 
-	directory = filepath.Join(directory, "io.github.Fohqul.Dislaunch")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("error getting user home directory: %s", err) // if we couldn't get the user's home directory, then the situation is so fucked we may as well crash
+	}
+	return filepath.Join(home, fallback)
+}
+
+func GetHomeXDGDislaunchDirectory(environment string, fallback string) string {
+	directory := filepath.Join(GetHomeXDGDirectory(environment, fallback), "io.github.Fohqul.Dislaunch")
 	stat, err := os.Stat(directory)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
@@ -48,5 +51,5 @@ func GetHomeXDGDirectory(environment string, fallback string) string {
 }
 
 func GetDataHome() string {
-	return GetHomeXDGDirectory("XDG_DATA_HOME", filepath.Join(".local", "share"))
+	return GetHomeXDGDislaunchDirectory("XDG_DATA_HOME", filepath.Join(".local", "share"))
 }

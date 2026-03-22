@@ -139,7 +139,7 @@ func (release *Release) pathName() string {
 }
 
 func (release *Release) getGobPath() string {
-	return filepath.Join(GetHomeXDGDirectory("XDG_STATE_HOME", filepath.Join(".local", "state")), release.String()+".gob")
+	return filepath.Join(GetHomeXDGDislaunchDirectory("XDG_STATE_HOME", filepath.Join(".local", "state")), release.String()+".gob")
 }
 
 func (release *Release) isInstalled() bool {
@@ -479,7 +479,7 @@ func (release *Release) Install() {
 	release.status = statusInstall
 	release.updateState()
 
-	tarballPath := filepath.Join(GetHomeXDGDirectory("XDG_CACHE_HOME", ".cache"), release.String())
+	tarballPath := filepath.Join(GetHomeXDGDislaunchDirectory("XDG_CACHE_HOME", ".cache"), release.String())
 	if installed {
 		tarballPath += "-" + internal.LatestVersion
 	}
@@ -578,6 +578,19 @@ func (release *Release) Install() {
 		return
 	}
 
+	var desktopEntry bytes.Buffer
+	var desktopFileName string
+	switch release {
+	case &Stable:
+		desktopFileName = "discord.desktop"
+	case &PTB:
+		desktopFileName = "discord-ptb.desktop"
+	case &Canary:
+		desktopFileName = "discord-canary.desktop"
+	default:
+		log.Fatalf("unknown release: %p", release)
+	}
+
 	format := archives.CompressedArchive{
 		Extraction:  archives.Tar{},
 		Compression: archives.Gz{},
@@ -631,6 +644,14 @@ func (release *Release) Install() {
 					release.updateState()
 					return err
 				}
+
+				if info.NameInArchive == filepath.Join(release.pathName(), desktopFileName) {
+					if _, err = desktopEntry.Write(buffer[:n]); err != nil {
+						release.err = fmt.Errorf("error writing desktop entry to buffer: %w", err)
+						release.updateState()
+						return err
+					}
+				}
 			}
 		}
 
@@ -644,6 +665,43 @@ func (release *Release) Install() {
 	if err = os.Remove(tarballPath); err != nil {
 		release.err = fmt.Errorf("error deleting tarball: %w", err)
 		release.updateState()
+	}
+
+	if desktopEntry.Len() == 0 {
+		release.err = fmt.Errorf("error finding desktop file")
+		release.updateState()
+	} else {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			release.err = fmt.Errorf("error getting home directory: %w", err)
+			release.updateState()
+		} else {
+			oldExec := "Exec=" + filepath.Join("/", "usr", "share", desktopFileName[:strings.IndexByte(desktopFileName, '.')], release.pathName())
+			newExec := "Exec=" + filepath.Join(home, ".local", "bin", "dislaunch") + " " + release.String()
+			dislaunchDesktopEntry := strings.ReplaceAll(desktopEntry.String(), oldExec, newExec)
+
+			dislaunchDesktopFile, err := os.OpenFile(filepath.Join(GetHomeXDGDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "applications", desktopFileName), os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				release.err = fmt.Errorf("error opening .desktop file: %w", err)
+				release.updateState()
+				return
+			}
+			defer dislaunchDesktopFile.Close()
+
+			release.message = "Writing desktop entry"
+			accumulated := 0
+			for accumulated < len(dislaunchDesktopEntry) {
+				n, err := dislaunchDesktopFile.Write([]byte(dislaunchDesktopEntry)[accumulated:])
+				if err != nil {
+					release.err = fmt.Errorf("error writing to desktop file: %w", err)
+					release.updateState()
+					return
+				}
+				accumulated += n
+				release.progress = uint8(float64(accumulated) / float64(len(dislaunchDesktopEntry)) * 100)
+				release.updateState()
+			}
+		}
 	}
 
 	if !installed {

@@ -64,7 +64,7 @@ func GetConfiguration() Configuration {
 
 	if err := assertWritePermissions(configuration.DefaultInstallPath); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing to configured install location '%s': %s\n", configuration.DefaultInstallPath, err)
-		configuration.DefaultInstallPath = GetHomeXDGDirectory("XDG_DATA_HOME", filepath.Join(".local", "share"))
+		configuration.DefaultInstallPath = GetHomeXDGDislaunchDirectory("XDG_DATA_HOME", filepath.Join(".local", "share"))
 	}
 	return configuration
 }
