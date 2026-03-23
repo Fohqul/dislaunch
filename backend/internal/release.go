@@ -578,6 +578,14 @@ func (release *Release) Install() {
 		return
 	}
 
+	defer func() {
+		// Even if extraction failed, that implies a possibly corrupted tarball, so still remove it
+		if err = os.Remove(tarballPath); err != nil {
+			release.err = fmt.Errorf("error deleting tarball: %w", err)
+			release.updateState()
+		}
+	}()
+
 	var desktopEntry bytes.Buffer
 	var desktopFileName string
 	switch release {
@@ -660,12 +668,7 @@ func (release *Release) Install() {
 	}); err != nil {
 		release.err = fmt.Errorf("error extracting tarball: %w", err)
 		release.updateState()
-	}
-
-	// Even if extraction failed, that implies a possibly corrupted tarball, so still remove it
-	if err = os.Remove(tarballPath); err != nil {
-		release.err = fmt.Errorf("error deleting tarball: %w", err)
-		release.updateState()
+		return
 	}
 
 	// Even if steps after this fail, still mark release as installed since it's been extracted
