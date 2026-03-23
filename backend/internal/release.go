@@ -92,7 +92,7 @@ type Release struct {
 	state    atomic.Value
 }
 
-var Stable, PTB, Canary Release
+var Stable, Ptb, Canary Release
 
 type BdChannel string
 
@@ -114,7 +114,7 @@ func (release *Release) String() string {
 	switch release {
 	case &Stable:
 		return "stable"
-	case &PTB:
+	case &Ptb:
 		return "ptb"
 	case &Canary:
 		return "canary"
@@ -128,7 +128,7 @@ func (release *Release) pathName() string {
 	switch release {
 	case &Stable:
 		return "Discord"
-	case &PTB:
+	case &Ptb:
 		return "DiscordPTB"
 	case &Canary:
 		return "DiscordCanary"
@@ -139,7 +139,7 @@ func (release *Release) pathName() string {
 }
 
 func (release *Release) getGobPath() string {
-	return filepath.Join(GetHomeXDGDislaunchDirectory("XDG_STATE_HOME", filepath.Join(".local", "state")), release.String()+".gob")
+	return filepath.Join(GetHomeXdgDislaunchDirectory("XDG_STATE_HOME", filepath.Join(".local", "state")), release.String()+".gob")
 }
 
 func (release *Release) isInstalled() bool {
@@ -479,7 +479,7 @@ func (release *Release) Install() {
 	release.status = statusInstall
 	release.updateState()
 
-	tarballPath := filepath.Join(GetHomeXDGDislaunchDirectory("XDG_CACHE_HOME", ".cache"), release.String())
+	tarballPath := filepath.Join(GetHomeXdgDislaunchDirectory("XDG_CACHE_HOME", ".cache"), release.String())
 	if installed {
 		tarballPath += "-" + internal.LatestVersion
 	}
@@ -591,7 +591,7 @@ func (release *Release) Install() {
 	switch release {
 	case &Stable:
 		desktopFileName = "discord.desktop"
-	case &PTB:
+	case &Ptb:
 		desktopFileName = "discord-ptb.desktop"
 	case &Canary:
 		desktopFileName = "discord-canary.desktop"
@@ -697,7 +697,7 @@ func (release *Release) Install() {
 	newExec := "Exec=" + filepath.Join(home, ".local", "bin", "dislaunch") + " " + release.String()
 	dislaunchDesktopEntry := strings.ReplaceAll(desktopEntry.String(), oldExec, newExec)
 
-	dislaunchDesktopFile, err := os.OpenFile(filepath.Join(GetHomeXDGDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "applications", desktopFileName), os.O_CREATE|os.O_WRONLY, 0644)
+	dislaunchDesktopFile, err := os.OpenFile(filepath.Join(GetHomeXdgDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "applications", desktopFileName), os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		release.err = fmt.Errorf("error opening .desktop file: %w", err)
 		release.updateState()

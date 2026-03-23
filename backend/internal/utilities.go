@@ -21,7 +21,7 @@ func GetRuntimeDirectory() string {
 	return runtimeDirectory
 }
 
-func GetHomeXDGDirectory(environment string, fallback string) string {
+func GetHomeXdgDirectory(environment string, fallback string) string {
 	if directory := os.Getenv(environment); directory != "" {
 		return directory
 	}
@@ -33,8 +33,8 @@ func GetHomeXDGDirectory(environment string, fallback string) string {
 	return filepath.Join(home, fallback)
 }
 
-func GetHomeXDGDislaunchDirectory(environment string, fallback string) string {
-	directory := filepath.Join(GetHomeXDGDirectory(environment, fallback), "io.github.Fohqul.Dislaunch")
+func GetHomeXdgDislaunchDirectory(environment string, fallback string) string {
+	directory := filepath.Join(GetHomeXdgDirectory(environment, fallback), "io.github.Fohqul.Dislaunch")
 	stat, err := os.Stat(directory)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
@@ -51,5 +51,5 @@ func GetHomeXDGDislaunchDirectory(environment string, fallback string) string {
 }
 
 func GetDataHome() string {
-	return GetHomeXDGDislaunchDirectory("XDG_DATA_HOME", filepath.Join(".local", "share"))
+	return GetHomeXdgDislaunchDirectory("XDG_DATA_HOME", filepath.Join(".local", "share"))
 }

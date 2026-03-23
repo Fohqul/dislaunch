@@ -116,7 +116,7 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 			case "stable":
 				go releaseCommand(&Stable, data, command)
 			case "ptb":
-				go releaseCommand(&PTB, data, command)
+				go releaseCommand(&Ptb, data, command)
 			case "canary":
 				go releaseCommand(&Canary, data, command)
 			case "config":
@@ -258,7 +258,7 @@ func StartListener() (func(), error) {
 
 type BackendState struct {
 	Stable        *ReleaseState `json:"stable"`
-	PTB           *ReleaseState `json:"ptb"`
+	Ptb           *ReleaseState `json:"ptb"`
 	Canary        *ReleaseState `json:"canary"`
 	Configuration Configuration `json:"config"`
 }
@@ -270,7 +270,7 @@ func BroadcastBackendState() {
 
 	buffer, err := json.Marshal(BackendState{
 		Stable:        Stable.GetState(),
-		PTB:           PTB.GetState(),
+		Ptb:           Ptb.GetState(),
 		Canary:        Canary.GetState(),
 		Configuration: GetConfiguration(),
 	})
