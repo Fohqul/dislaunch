@@ -604,53 +604,54 @@ func (release *Release) Install() {
 				release.updateState()
 				return err
 			}
-		} else {
-			source, err := info.Open()
+			return nil
+		}
+
+		source, err := info.Open()
+		if err != nil {
+			release.err = fmt.Errorf("error opening extracted file '%s': %w", info.NameInArchive, err)
+			release.updateState()
+			return err
+		}
+		defer source.Close()
+
+		destination, err := os.OpenFile(filepath.Join(installPath, info.NameInArchive), os.O_CREATE|os.O_WRONLY, info.Mode().Perm())
+		if err != nil {
+			release.err = fmt.Errorf("error opening destination file '%s': %w", filepath.Join(installPath, info.NameInArchive), err)
+			release.updateState()
+			return err
+		}
+		defer destination.Close()
+
+		buffer := make([]byte, 32*1024)
+		accumulated := 0
+		finished := false
+		for !finished {
+			n, err := source.Read(buffer)
 			if err != nil {
-				release.err = fmt.Errorf("error opening extracted file '%s': %w", info.NameInArchive, err)
-				release.updateState()
-				return err
-			}
-			defer source.Close()
-
-			destination, err := os.OpenFile(filepath.Join(installPath, info.NameInArchive), os.O_CREATE|os.O_WRONLY, info.Mode().Perm())
-			if err != nil {
-				release.err = fmt.Errorf("error opening destination file '%s': %w", filepath.Join(installPath, info.NameInArchive), err)
-				release.updateState()
-				return err
-			}
-			defer destination.Close()
-
-			buffer := make([]byte, 32*1024)
-			accumulated := 0
-			finished := false
-			for !finished {
-				n, err := source.Read(buffer)
-				if err != nil {
-					if err != io.EOF {
-						release.err = fmt.Errorf("error reading extracted file '%s': %w", info.NameInArchive, err)
-						release.updateState()
-						return err
-					}
-
-					finished = true
-				}
-				accumulated += n
-				release.progress = uint8(float64(accumulated) / float64(info.Size()) * 100)
-				release.updateState()
-
-				if _, err = destination.Write(buffer[:n]); err != nil {
-					release.err = fmt.Errorf("error writing extracted file '%s': %w", info.NameInArchive, err)
+				if err != io.EOF {
+					release.err = fmt.Errorf("error reading extracted file '%s': %w", info.NameInArchive, err)
 					release.updateState()
 					return err
 				}
 
-				if info.NameInArchive == filepath.Join(release.pathName(), desktopFileName) {
-					if _, err = desktopEntry.Write(buffer[:n]); err != nil {
-						release.err = fmt.Errorf("error writing desktop entry to buffer: %w", err)
-						release.updateState()
-						return err
-					}
+				finished = true
+			}
+			accumulated += n
+			release.progress = uint8(float64(accumulated) / float64(info.Size()) * 100)
+			release.updateState()
+
+			if _, err = destination.Write(buffer[:n]); err != nil {
+				release.err = fmt.Errorf("error writing extracted file '%s': %w", info.NameInArchive, err)
+				release.updateState()
+				return err
+			}
+
+			if info.NameInArchive == filepath.Join(release.pathName(), desktopFileName) {
+				if _, err = desktopEntry.Write(buffer[:n]); err != nil {
+					release.err = fmt.Errorf("error writing desktop entry to buffer: %w", err)
+					release.updateState()
+					return err
 				}
 			}
 		}
