@@ -668,43 +668,7 @@ func (release *Release) Install() {
 		release.updateState()
 	}
 
-	if desktopEntry.Len() == 0 {
-		release.err = fmt.Errorf("error finding desktop file")
-		release.updateState()
-	} else {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			release.err = fmt.Errorf("error getting home directory: %w", err)
-			release.updateState()
-		} else {
-			oldExec := "Exec=" + filepath.Join("/", "usr", "share", desktopFileName[:strings.IndexByte(desktopFileName, '.')], release.pathName())
-			newExec := "Exec=" + filepath.Join(home, ".local", "bin", "dislaunch") + " " + release.String()
-			dislaunchDesktopEntry := strings.ReplaceAll(desktopEntry.String(), oldExec, newExec)
-
-			dislaunchDesktopFile, err := os.OpenFile(filepath.Join(GetHomeXDGDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "applications", desktopFileName), os.O_CREATE|os.O_WRONLY, 0644)
-			if err != nil {
-				release.err = fmt.Errorf("error opening .desktop file: %w", err)
-				release.updateState()
-				return
-			}
-			defer dislaunchDesktopFile.Close()
-
-			release.message = "Writing desktop entry"
-			accumulated := 0
-			for accumulated < len(dislaunchDesktopEntry) {
-				n, err := dislaunchDesktopFile.Write([]byte(dislaunchDesktopEntry)[accumulated:])
-				if err != nil {
-					release.err = fmt.Errorf("error writing to desktop file: %w", err)
-					release.updateState()
-					return
-				}
-				accumulated += n
-				release.progress = uint8(float64(accumulated) / float64(len(dislaunchDesktopEntry)) * 100)
-				release.updateState()
-			}
-		}
-	}
-
+	// Even if steps after this fail, still mark release as installed since it's been extracted
 	if !installed {
 		release.setInternal(&releaseInternal{
 			InstallPath: installPath,
@@ -712,6 +676,46 @@ func (release *Release) Install() {
 			BdChannel:   BdStable,
 		})
 	}
+
+	if desktopEntry.Len() == 0 {
+		release.err = fmt.Errorf("error finding desktop file")
+		release.updateState()
+		return
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		release.err = fmt.Errorf("error getting home directory: %w", err)
+		release.updateState()
+		return
+	}
+
+	oldExec := "Exec=" + filepath.Join("/", "usr", "share", desktopFileName[:strings.IndexByte(desktopFileName, '.')], release.pathName())
+	newExec := "Exec=" + filepath.Join(home, ".local", "bin", "dislaunch") + " " + release.String()
+	dislaunchDesktopEntry := strings.ReplaceAll(desktopEntry.String(), oldExec, newExec)
+
+	dislaunchDesktopFile, err := os.OpenFile(filepath.Join(GetHomeXDGDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "applications", desktopFileName), os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		release.err = fmt.Errorf("error opening .desktop file: %w", err)
+		release.updateState()
+		return
+	}
+	defer dislaunchDesktopFile.Close()
+
+	release.message = "Writing desktop entry"
+	accumulated := 0
+	for accumulated < len(dislaunchDesktopEntry) {
+		n, err := dislaunchDesktopFile.Write([]byte(dislaunchDesktopEntry)[accumulated:])
+		if err != nil {
+			release.err = fmt.Errorf("error writing to desktop file: %w", err)
+			release.updateState()
+			return
+		}
+		accumulated += n
+		release.progress = uint8(float64(accumulated) / float64(len(dislaunchDesktopEntry)) * 100)
+		release.updateState()
+	}
+
 }
 
 func (release *Release) Move(path string) {
