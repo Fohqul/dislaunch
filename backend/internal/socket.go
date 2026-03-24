@@ -120,20 +120,20 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 			case "canary":
 				go releaseCommand(&Canary, data, command)
 			case "config":
-				if len(command) < 3 {
-					fmt.Fprintln(os.Stderr, "setting required for configuration option")
-					return
+				var argument string
+				if len(command) > 2 {
+					argument = command[2]
 				}
 				// i should be taken out back for nesting switch statements like this. there is certainly a better way of handling commands/subcommands/arguments
 				switch command[1] {
 				case "automatically_check_for_updates":
-					setBoolean(SetAutomaticallyCheckForUpdates, command[2])
+					setBoolean(SetAutomaticallyCheckForUpdates, argument)
 				case "notify_on_update_available":
-					setBoolean(SetNotifyOnUpdateAvailable, command[2])
+					setBoolean(SetNotifyOnUpdateAvailable, argument)
 				case "automatically_install_updates":
-					setBoolean(SetAutomaticallyInstallUpdates, command[2])
+					setBoolean(SetAutomaticallyInstallUpdates, argument)
 				case "default_install_path":
-					if err = SetDefaultInstallPath(command[2]); err != nil {
+					if err = SetDefaultInstallPath(argument); err != nil {
 						fmt.Fprintf(os.Stderr, "error setting default installation path: %s\n", err)
 						go BroadcastBackendState() // if `SetDefaultInstallPath` fails, `setConfiguration` never runs and therefore `BroadcastBackendState` never runs
 					}
