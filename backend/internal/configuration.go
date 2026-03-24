@@ -71,11 +71,11 @@ func GetConfiguration() Configuration {
 
 func setConfiguration(configuration Configuration) error {
 	configurationFile, close := openConfigurationFile(os.O_WRONLY)
+	defer close()
 	if err := json.NewEncoder(configurationFile).Encode(configuration); err != nil {
 		fmt.Fprintf(os.Stderr, "error encoding configuration: %s\n", err)
 		return err // todo should this be fatal?
 	}
-	close()
 
 	go BroadcastBackendState()
 
