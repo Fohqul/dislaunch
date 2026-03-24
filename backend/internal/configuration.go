@@ -1,7 +1,7 @@
 package dislaunch
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"log"
@@ -58,7 +58,7 @@ func GetConfiguration() Configuration {
 	defer close()
 
 	var configuration Configuration
-	if err := json.NewDecoder(configurationFile).Decode(&configuration); err != nil && err != io.EOF {
+	if err := json.UnmarshalRead(configurationFile, &configuration); err != nil && err != io.EOF {
 		fmt.Fprintf(os.Stderr, "error decoding configuration: %s\n", err)
 	}
 
@@ -72,7 +72,7 @@ func GetConfiguration() Configuration {
 func setConfiguration(configuration Configuration) error {
 	configurationFile, close := openConfigurationFile(os.O_WRONLY)
 	defer close()
-	if err := json.NewEncoder(configurationFile).Encode(configuration); err != nil {
+	if err := json.MarshalWrite(configurationFile, configuration); err != nil {
 		fmt.Fprintf(os.Stderr, "error encoding configuration: %s\n", err)
 		return err // todo should this be fatal?
 	}

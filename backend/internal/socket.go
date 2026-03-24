@@ -3,7 +3,7 @@ package dislaunch
 import (
 	"bufio"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -135,7 +135,6 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 				case "default_install_path":
 					if err = SetDefaultInstallPath(argument); err != nil {
 						fmt.Fprintf(os.Stderr, "error setting default installation path: %s\n", err)
-						go BroadcastBackendState() // if `SetDefaultInstallPath` fails, `setConfiguration` never runs and therefore `BroadcastBackendState` never runs
 					}
 				default:
 					fmt.Fprintf(os.Stderr, "unknown configuration option: %s\n", command[1])

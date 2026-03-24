@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -253,7 +253,7 @@ func (release *Release) getVersion() (string, error) {
 		Version        string `json:"version"`
 		ReleaseChannel string `json:"releaseChannel"`
 	}
-	if err = json.NewDecoder(file).Decode(&buildInfo); err != nil {
+	if err = json.UnmarshalRead(file, &buildInfo); err != nil {
 		return "", err
 	}
 	if buildInfo.ReleaseChannel != release.String() {
@@ -437,7 +437,7 @@ func (release *Release) CheckForUpdates() {
 		Name string `json:"name"`
 		// `pub_date` isn't used
 	}
-	if err := json.NewDecoder(&buffer).Decode(&latestVersion); err != nil {
+	if err := json.UnmarshalRead(&buffer, &latestVersion); err != nil {
 		release.err = fmt.Errorf("error decoding latest version info: %w", err)
 		release.updateState()
 		return
