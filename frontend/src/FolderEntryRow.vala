@@ -13,7 +13,7 @@ class FolderEntryRow : Adw.EntryRow {
 
 		file_dialog = new Gtk.FileDialog () { initial_folder = initial_folder };
 
-		var button = new Gtk.Button.from_icon_name ("document-open-folder") { valign = Gtk.Align.CENTER };
+		var button = new Gtk.Button.from_icon_name ("folder-open") { valign = Gtk.Align.CENTER };
 		button.clicked.connect (() => file_dialog.select_folder.begin (window, null, (_, result) => {
 			try {
 				handler (file_dialog.select_folder.end (result).get_path ());
