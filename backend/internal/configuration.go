@@ -59,7 +59,11 @@ func GetConfiguration() Configuration {
 
 	var configuration Configuration
 	if err := json.UnmarshalRead(configurationFile, &configuration); err != nil && err != io.EOF {
-		fmt.Fprintf(os.Stderr, "error decoding configuration: %s\n", err)
+		if stat, err := configurationFile.Stat(); err != nil {
+			fmt.Fprintf(os.Stderr, "error getting stat of configuration file: %s\n", err)
+		} else if stat.Size() != 0 {
+			fmt.Fprintf(os.Stderr, "error decoding configuration: %s\n", err)
+		}
 	}
 
 	if err := assertWritePermissions(configuration.DefaultInstallPath); err != nil {
