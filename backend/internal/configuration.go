@@ -53,7 +53,7 @@ func assertWritePermissions(path string) error {
 	return nil
 }
 
-func GetConfiguration() Configuration {
+func getConfiguration() Configuration {
 	configurationFile, close := openConfigurationFile(os.O_RDONLY)
 	defer close()
 
@@ -68,7 +68,7 @@ func GetConfiguration() Configuration {
 
 	if err := assertWritePermissions(configuration.DefaultInstallPath); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing to configured install location '%s': %s\n", configuration.DefaultInstallPath, err)
-		configuration.DefaultInstallPath = GetHomeXdgDislaunchDirectory("XDG_DATA_HOME", filepath.Join(".local", "share"))
+		configuration.DefaultInstallPath = getHomeXdgDislaunchDirectory("XDG_DATA_HOME", filepath.Join(".local", "share"))
 	}
 	return configuration
 }
@@ -81,7 +81,7 @@ func setConfiguration(configuration Configuration) error {
 		return err // todo should this be fatal?
 	}
 
-	go BroadcastBackendState()
+	go broadcastBackendState()
 
 	return nil
 }
@@ -97,34 +97,34 @@ func setConfiguration(configuration Configuration) error {
 // Therefore, a mutex is used to prevent this.
 var mu sync.Mutex
 
-func SetAutomaticallyCheckForUpdates(setting bool) {
+func setAutomaticallyCheckForUpdates(setting bool) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	configuration := GetConfiguration()
+	configuration := getConfiguration()
 	configuration.AutomaticallyCheckForUpdates = setting
 	setConfiguration(configuration)
 }
 
-func SetNotifyOnUpdateAvailable(setting bool) {
+func setNotifyOnUpdateAvailable(setting bool) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	configuration := GetConfiguration()
+	configuration := getConfiguration()
 	configuration.NotifyOnUpdateAvailable = setting
 	setConfiguration(configuration)
 }
 
-func SetAutomaticallyInstallUpdates(setting bool) {
+func setAutomaticallyInstallUpdates(setting bool) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	configuration := GetConfiguration()
+	configuration := getConfiguration()
 	configuration.AutomaticallyInstallUpdates = setting
 	setConfiguration(configuration)
 }
 
-func SetDefaultInstallPath(path string) error {
+func setDefaultInstallPath(path string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -140,7 +140,7 @@ func SetDefaultInstallPath(path string) error {
 		return err
 	}
 
-	configuration := GetConfiguration()
+	configuration := getConfiguration()
 	configuration.DefaultInstallPath = path
 	setConfiguration(configuration)
 	return nil

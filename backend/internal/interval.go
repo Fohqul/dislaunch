@@ -9,9 +9,9 @@ import (
 	"github.com/gen2brain/beeep"
 )
 
-func runInterval(configuration Configuration, release *Release) {
-	release.CheckForUpdates()
-	state := release.GetState()
+func runInterval(configuration Configuration, release *release) {
+	release.checkForUpdates()
+	state := release.getState()
 	if state == nil || state.Version == state.Internal.LatestVersion {
 		return
 	}
@@ -19,9 +19,9 @@ func runInterval(configuration Configuration, release *Release) {
 	if configuration.NotifyOnUpdateAvailable {
 		message := "There's an update available for Discord."
 		switch release {
-		case &Ptb:
+		case &ptb:
 			message = "There's an update available for Discord PTB."
-		case &Canary:
+		case &canary:
 			message = "There's an update available for Discord Canary."
 		}
 		if err := beeep.Notify("Update available", message, "software-update-available"); err != nil {
@@ -30,19 +30,19 @@ func runInterval(configuration Configuration, release *Release) {
 	}
 
 	if configuration.AutomaticallyInstallUpdates {
-		release.Install()
+		release.install()
 	}
 }
 
-func StartIntervals() {
+func startIntervals() {
 	for range time.Tick(10 * time.Minute) {
-		configuration := GetConfiguration()
+		configuration := getConfiguration()
 		if !configuration.AutomaticallyCheckForUpdates {
 			continue
 		}
 
 		var wg sync.WaitGroup
-		for _, release := range []*Release{&Stable, &Ptb, &Canary} {
+		for _, release := range []*release{&stable, &ptb, &canary} {
 			wg.Go(func() {
 				runInterval(configuration, release)
 			})

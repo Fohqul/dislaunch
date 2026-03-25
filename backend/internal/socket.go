@@ -42,7 +42,7 @@ func setBoolean(set func(bool), setting string) {
 	}
 }
 
-func releaseCommand(release *Release, data string, command []string) {
+func releaseCommand(release *release, data string, command []string) {
 	switch command[1] {
 	case "bd_enabled":
 		if len(command) < 3 {
@@ -50,7 +50,7 @@ func releaseCommand(release *Release, data string, command []string) {
 			return
 		}
 		setBoolean(func(enabled bool) {
-			go release.SetBdEnabled(enabled)
+			go release.setBdEnabled(enabled)
 		}, command[2])
 	case "bd_channel":
 		if len(command) < 3 {
@@ -59,27 +59,27 @@ func releaseCommand(release *Release, data string, command []string) {
 		}
 		switch command[2] {
 		case "stable":
-			go release.SetBdChannel(BdStable)
+			go release.setBdChannel(bdStable)
 		case "canary":
-			go release.SetBdChannel(BdCanary)
+			go release.setBdChannel(bdCanary)
 		default:
 			fmt.Fprintf(os.Stderr, "unknown BetterDiscord channel: %s\n", command[2])
 		}
 	case "check_for_updates":
-		go release.CheckForUpdates()
+		go release.checkForUpdates()
 	case "command_line_arguments":
 		// Use a slice directly from `data` so the raw arguments are kept as-is and not lost from `string.Fields`
-		go release.SetCommandLineArguments(data[len(release.String()+" command_line_arguments ") : len(data)-1])
+		go release.setCommandLineArguments(data[len(release.String()+" command_line_arguments ") : len(data)-1])
 	case "install":
-		go release.Install()
+		go release.install()
 	case "move":
 		if len(command) < 3 {
 			fmt.Fprintln(os.Stderr, "path required to move release")
 			return
 		}
-		go release.Move(command[2])
+		go release.move(command[2])
 	case "uninstall":
-		go release.Uninstall()
+		go release.uninstall()
 	default:
 		fmt.Fprintf(os.Stderr, "unknown argument: %s\n", command[1])
 	}
@@ -112,13 +112,13 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 
 			switch command[0] {
 			case "state":
-				go BroadcastBackendState()
+				go broadcastBackendState()
 			case "stable":
-				go releaseCommand(&Stable, data, command)
+				go releaseCommand(&stable, data, command)
 			case "ptb":
-				go releaseCommand(&Ptb, data, command)
+				go releaseCommand(&ptb, data, command)
 			case "canary":
-				go releaseCommand(&Canary, data, command)
+				go releaseCommand(&canary, data, command)
 			case "config":
 				var argument string
 				if len(command) > 2 {
@@ -127,13 +127,13 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 				// i should be taken out back for nesting switch statements like this. there is certainly a better way of handling commands/subcommands/arguments
 				switch command[1] {
 				case "automatically_check_for_updates":
-					setBoolean(SetAutomaticallyCheckForUpdates, argument)
+					setBoolean(setAutomaticallyCheckForUpdates, argument)
 				case "notify_on_update_available":
-					setBoolean(SetNotifyOnUpdateAvailable, argument)
+					setBoolean(setNotifyOnUpdateAvailable, argument)
 				case "automatically_install_updates":
-					setBoolean(SetAutomaticallyInstallUpdates, argument)
+					setBoolean(setAutomaticallyInstallUpdates, argument)
 				case "default_install_path":
-					if err = SetDefaultInstallPath(argument); err != nil {
+					if err = setDefaultInstallPath(argument); err != nil {
 						fmt.Fprintf(os.Stderr, "error setting default installation path: %s\n", err)
 					}
 				default:
@@ -234,7 +234,7 @@ func StartListener() (func(), error) {
 		}
 	}()
 
-	go StartIntervals()
+	go startIntervals()
 
 	return func() {
 		if listener == nil {
@@ -262,16 +262,16 @@ type BackendState struct {
 	Configuration Configuration `json:"config"`
 }
 
-func BroadcastBackendState() {
+func broadcastBackendState() {
 	if listener == nil {
 		return
 	}
 
 	buffer, err := json.Marshal(BackendState{
-		Stable:        Stable.GetState(),
-		Ptb:           Ptb.GetState(),
-		Canary:        Canary.GetState(),
-		Configuration: GetConfiguration(),
+		Stable:        stable.getState(),
+		Ptb:           ptb.getState(),
+		Canary:        canary.getState(),
+		Configuration: getConfiguration(),
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error marshalling backend state to JSON: %s\n", err)

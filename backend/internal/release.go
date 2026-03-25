@@ -83,7 +83,7 @@ const (
 // `Install`, along with the state associated with that,
 // such as `status`, `message`, `progress` and `err`.
 
-type Release struct {
+type release struct {
 	mu       sync.Mutex
 	status   status // currently active process
 	message  string
@@ -92,13 +92,13 @@ type Release struct {
 	state    atomic.Value
 }
 
-var Stable, Ptb, Canary Release
+var stable, ptb, canary release
 
-type BdChannel string
+type bdChannel string
 
 const (
-	BdStable BdChannel = "stable"
-	BdCanary BdChannel = "canary"
+	bdStable bdChannel = "stable"
+	bdCanary bdChannel = "canary"
 )
 
 type releaseInternal struct {
@@ -107,16 +107,16 @@ type releaseInternal struct {
 	LatestVersion        string    `json:"latest_version"`
 	CommandLineArguments string    `json:"command_line_arguments"`
 	BdEnabled            bool      `json:"bd_enabled"`
-	BdChannel            BdChannel `json:"bd_channel"`
+	BdChannel            bdChannel `json:"bd_channel"`
 }
 
-func (release *Release) String() string {
+func (release *release) String() string {
 	switch release {
-	case &Stable:
+	case &stable:
 		return "stable"
-	case &Ptb:
+	case &ptb:
 		return "ptb"
-	case &Canary:
+	case &canary:
 		return "canary"
 	}
 
@@ -124,13 +124,13 @@ func (release *Release) String() string {
 	return ""
 }
 
-func (release *Release) pathName() string {
+func (release *release) pathName() string {
 	switch release {
-	case &Stable:
+	case &stable:
 		return "Discord"
-	case &Ptb:
+	case &ptb:
 		return "DiscordPTB"
-	case &Canary:
+	case &canary:
 		return "DiscordCanary"
 	}
 
@@ -138,11 +138,11 @@ func (release *Release) pathName() string {
 	return ""
 }
 
-func (release *Release) getGobPath() string {
-	return filepath.Join(GetHomeXdgDislaunchDirectory("XDG_STATE_HOME", filepath.Join(".local", "state")), release.String()+".gob")
+func (release *release) getGobPath() string {
+	return filepath.Join(getHomeXdgDislaunchDirectory("XDG_STATE_HOME", filepath.Join(".local", "state")), release.String()+".gob")
 }
 
-func (release *Release) isInstalled() bool {
+func (release *release) isInstalled() bool {
 	_, err := os.Stat(release.getGobPath())
 	if err == nil {
 		return true
@@ -168,7 +168,7 @@ func (release *Release) isInstalled() bool {
 // installed.)
 
 // `nil, nil` return value means an error occurred
-func (release *Release) openGob(flag int) (*os.File, func()) {
+func (release *release) openGob(flag int) (*os.File, func()) {
 	path := release.getGobPath()
 	lock := flock.New(path)
 	// Whilst we would ideally allow `getInternal` to take a shared lock, it may be replaced with an exclusive lock by a call to `setInternal`. See https://pkg.go.dev/github.com/gofrs/flock#Flock.Lock
@@ -187,7 +187,7 @@ func (release *Release) openGob(flag int) (*os.File, func()) {
 	}
 }
 
-func (release *Release) getInternal() (releaseInternal, error) {
+func (release *release) getInternal() (releaseInternal, error) {
 	if !release.isInstalled() {
 		return releaseInternal{}, fmt.Errorf("release '%s' is not installed", release)
 	}
@@ -208,7 +208,7 @@ func (release *Release) getInternal() (releaseInternal, error) {
 	return internal, nil
 }
 
-func (release *Release) setInternal(internal *releaseInternal) error {
+func (release *release) setInternal(internal *releaseInternal) error {
 	if internal == nil {
 		err := fmt.Errorf("internal is nil")
 		fmt.Fprintln(os.Stderr, err)
@@ -237,7 +237,7 @@ func (release *Release) setInternal(internal *releaseInternal) error {
  * need to keep track of it ourselves.
  */
 
-func (release *Release) getVersion() (string, error) {
+func (release *release) getVersion() (string, error) {
 	internal, err := release.getInternal()
 	if err != nil {
 		return "", err
@@ -265,7 +265,7 @@ func (release *Release) getVersion() (string, error) {
 	return buildInfo.Version, nil
 }
 
-func (release *Release) takeOver() (*releaseInternal, func()) {
+func (release *release) takeOver() (*releaseInternal, func()) {
 	release.mu.Lock()
 
 	if release.status == statusFatal {
@@ -295,7 +295,7 @@ type ReleaseState struct {
 	Process  *releaseProcessView `json:"process"`
 }
 
-func (release *Release) updateState() {
+func (release *release) updateState() {
 	state := &ReleaseState{}
 
 	if internal, err := release.getInternal(); err == nil {
@@ -316,10 +316,10 @@ func (release *Release) updateState() {
 	}
 
 	release.state.Store(state)
-	go BroadcastBackendState()
+	go broadcastBackendState()
 }
 
-func (release *Release) resetState() {
+func (release *release) resetState() {
 	if release.status == statusFatal {
 		return
 	}
@@ -331,7 +331,7 @@ func (release *Release) resetState() {
 	release.updateState()
 }
 
-func (release *Release) GetState() *ReleaseState {
+func (release *release) getState() *ReleaseState {
 	// `GetState` returns the atomic value `release.state`
 	// because if it composed/constructed the state using
 	// `getInternal` and `getVersion`, it would require the
@@ -367,7 +367,7 @@ func (release *Release) GetState() *ReleaseState {
 	return state
 }
 
-func (release *Release) SetCommandLineArguments(commandLineArguments string) {
+func (release *release) setCommandLineArguments(commandLineArguments string) {
 	internal, reset := release.takeOver()
 	if internal == nil || reset == nil {
 		return
@@ -378,7 +378,7 @@ func (release *Release) SetCommandLineArguments(commandLineArguments string) {
 	release.setInternal(internal)
 }
 
-func (release *Release) SetBdEnabled(bdEnabled bool) {
+func (release *release) setBdEnabled(bdEnabled bool) {
 	internal, reset := release.takeOver()
 	if internal == nil || reset == nil {
 		return
@@ -397,7 +397,7 @@ func (release *Release) SetBdEnabled(bdEnabled bool) {
 	}
 }
 
-func (release *Release) SetBdChannel(bdChannel BdChannel) {
+func (release *release) setBdChannel(bdChannel bdChannel) {
 	internal, reset := release.takeOver()
 	if internal == nil || reset == nil {
 		return
@@ -414,7 +414,7 @@ func (release *Release) SetBdChannel(bdChannel BdChannel) {
 	}
 }
 
-func (release *Release) CheckForUpdates() {
+func (release *release) checkForUpdates() {
 	internal, reset := release.takeOver()
 	if internal == nil || reset == nil {
 		return
@@ -448,7 +448,7 @@ func (release *Release) CheckForUpdates() {
 	release.setInternal(internal)
 }
 
-func (release *Release) Install() {
+func (release *release) install() {
 	// can't use `takeOver` because it fails if not installed
 	release.mu.Lock()
 	defer release.mu.Unlock()
@@ -479,7 +479,7 @@ func (release *Release) Install() {
 	release.status = statusInstall
 	release.updateState()
 
-	tarballPath := filepath.Join(GetHomeXdgDislaunchDirectory("XDG_CACHE_HOME", ".cache"), release.String())
+	tarballPath := filepath.Join(getHomeXdgDislaunchDirectory("XDG_CACHE_HOME", ".cache"), release.String())
 	if installed {
 		tarballPath += "-" + internal.LatestVersion
 	}
@@ -530,9 +530,9 @@ func (release *Release) Install() {
 
 	installPath := internal.InstallPath
 	if installPath == "" {
-		installPath = GetConfiguration().DefaultInstallPath
+		installPath = getConfiguration().DefaultInstallPath
 		if installPath == "" {
-			installPath = GetDataHome()
+			installPath = getDataHome()
 		}
 	}
 	if installed {
@@ -589,11 +589,11 @@ func (release *Release) Install() {
 	var desktopEntry bytes.Buffer
 	var desktopFileName string
 	switch release {
-	case &Stable:
+	case &stable:
 		desktopFileName = "discord.desktop"
-	case &Ptb:
+	case &ptb:
 		desktopFileName = "discord-ptb.desktop"
-	case &Canary:
+	case &canary:
 		desktopFileName = "discord-canary.desktop"
 	default:
 		log.Fatalf("unknown release: %p", release)
@@ -676,7 +676,7 @@ func (release *Release) Install() {
 		release.setInternal(&releaseInternal{
 			InstallPath: installPath,
 			LastChecked: time.Now(), // todo this is silly if we're using a cached tarball and signals that whether a release is installed should not be determined by the presence of its gob/internal data
-			BdChannel:   BdStable,
+			BdChannel:   bdStable,
 		})
 	}
 
@@ -697,7 +697,7 @@ func (release *Release) Install() {
 	newExec := "Exec=" + filepath.Join(home, ".local", "bin", "dislaunch") + " " + release.String()
 	dislaunchDesktopEntry := strings.ReplaceAll(desktopEntry.String(), oldExec, newExec)
 
-	dislaunchDesktopFile, err := os.OpenFile(filepath.Join(GetHomeXdgDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "applications", desktopFileName), os.O_CREATE|os.O_WRONLY, 0644)
+	dislaunchDesktopFile, err := os.OpenFile(filepath.Join(getHomeXdgDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "applications", desktopFileName), os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		release.err = fmt.Errorf("error opening .desktop file: %w", err)
 		release.updateState()
@@ -721,7 +721,7 @@ func (release *Release) Install() {
 
 }
 
-func (release *Release) Move(path string) {
+func (release *release) move(path string) {
 	internal, reset := release.takeOver()
 	if internal == nil || reset == nil {
 		return
@@ -779,7 +779,7 @@ func (release *Release) Move(path string) {
 	release.setInternal(internal)
 }
 
-func (release *Release) Uninstall() {
+func (release *release) uninstall() {
 	internal, reset := release.takeOver()
 	if internal == nil || reset == nil {
 		return
@@ -809,7 +809,7 @@ func (release *Release) Uninstall() {
 	release.updateState()
 }
 
-func (release *Release) injectBd() {
+func (release *release) injectBd() {
 	internal, reset := release.takeOver()
 	if internal == nil || reset == nil {
 		return
@@ -819,7 +819,7 @@ func (release *Release) injectBd() {
 	// TODO
 }
 
-func (release *Release) uninjectBd() {
+func (release *release) uninjectBd() {
 	internal, reset := release.takeOver()
 	if internal == nil || reset == nil {
 		return
