@@ -169,17 +169,26 @@ class Socket {
 		return node.get_value ();
 	}
 
-	private void parse_release (Json.Node release, out ReleaseState? state) throws SocketError {
-		if (release.get_node_type () == Json.NodeType.NULL) {
+	private void parse_release (Json.Object parent_object, string channel, out ReleaseState? state) throws SocketError {
+		if (!parent_object.has_member (channel)) {
 			state = null;
 			return;
 		}
+
+		var release = parent_object.get_member (channel);
+		if (release.get_node_type () != Json.NodeType.OBJECT)
+			throw new SocketError.INVALID_RESPONSE ("release '%s' is not an object", channel);
+
 		state = {};
 
 		var object = release.get_object ();
 
-		var release_internal = object.get_member ("internal");
-		if (release_internal.get_node_type () == Json.NodeType.OBJECT) {
+		if (object.has_member ("internal")) {
+			var release_internal = object.get_member ("internal");
+
+			if (release_internal.get_node_type () != Json.NodeType.OBJECT)
+				throw new SocketError.INVALID_RESPONSE ("invalid internal node type: %d", release_internal.get_node_type ());
+
 			state.internal = {};
 			var internal_object = release_internal.get_object ();
 			// try {
@@ -198,10 +207,8 @@ class Socket {
 			// } catch (Error e) {
 			// critical = e;
 			// }
-		} else if (release_internal.get_node_type () == Json.NodeType.NULL)
+		} else
 			state.internal = null;
-		else
-			throw new SocketError.INVALID_RESPONSE ("invalid internal node type: %d", release_internal.get_node_type ());
 
 		// try {
 		state.version = parse_value (object.get_member ("version"), Type.STRING).get_string ();
@@ -239,9 +246,9 @@ class Socket {
 			var root_object = root.get_object ();
 			BackendState backend_state = {};
 
-			parse_release (root_object.get_member ("stable"), out backend_state.stable);
-			parse_release (root_object.get_member ("ptb"), out backend_state.ptb);
-			parse_release (root_object.get_member ("canary"), out backend_state.canary);
+			parse_release (root_object, "stable", out backend_state.stable);
+			parse_release (root_object, "ptb", out backend_state.ptb);
+			parse_release (root_object, "canary", out backend_state.canary);
 
 			var config = root_object.get_member ("config");
 			if (config.get_node_type () != Json.NodeType.OBJECT)

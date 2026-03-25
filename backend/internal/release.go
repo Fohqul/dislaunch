@@ -290,7 +290,7 @@ type releaseProcessView struct {
 }
 
 type ReleaseState struct {
-	Internal *releaseInternal    `json:"internal"`
+	Internal *releaseInternal    `json:"internal,omitempty"`
 	Version  string              `json:"version"`
 	Process  *releaseProcessView `json:"process"`
 }

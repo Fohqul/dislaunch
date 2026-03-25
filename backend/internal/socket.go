@@ -256,9 +256,9 @@ func StartListener() (func(), error) {
 }
 
 type BackendState struct {
-	Stable        *ReleaseState `json:"stable"`
-	Ptb           *ReleaseState `json:"ptb"`
-	Canary        *ReleaseState `json:"canary"`
+	Stable        *ReleaseState `json:"stable,omitempty"`
+	Ptb           *ReleaseState `json:"ptb,omitempty"`
+	Canary        *ReleaseState `json:"canary,omitempty"`
 	Configuration Configuration `json:"config"`
 }
 
