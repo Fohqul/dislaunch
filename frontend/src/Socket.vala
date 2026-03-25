@@ -160,7 +160,7 @@ class Socket {
 
 	private Socket () {}
 
-	private Value parse_value (Json.Node node, GLib.Type type) throws SocketError {
+	private Value parse_value (Json.Node node, Type type) throws SocketError {
 		if (node.get_node_type () != Json.NodeType.VALUE)
 			throw new SocketError.INVALID_RESPONSE ("not a value: %d", node.get_node_type ());
 		if (node.get_value_type () != type)
