@@ -137,9 +137,9 @@ class Application : Adw.Application {
 		var canary = new Release (application_window, ReleaseChannel.CANARY);
 
 		var release_view_stack = new Adw.ViewStack () { enable_transitions = true };
-		release_view_stack.add_titled_with_icon (stable, stable.channel.id, "Discord", "discord");
-		release_view_stack.add_titled_with_icon (ptb, ptb.channel.id, "Discord PTB", "discord-ptb");
-		release_view_stack.add_titled_with_icon (canary, canary.channel.id, "Discord Canary", "discord-canary");
+		release_view_stack.add_titled_with_icon (stable, stable.channel.id, stable.channel.title, "discord");
+		release_view_stack.add_titled_with_icon (ptb, ptb.channel.id, ptb.channel.title, "discord-ptb");
+		release_view_stack.add_titled_with_icon (canary, canary.channel.id, canary.channel.title, "discord-canary");
 		release_toolbar_view.content = release_view_stack;
 
 		release_toolbar_view.add_top_bar (new Adw.ViewSwitcher () { stack = release_view_stack, policy = Adw.ViewSwitcherPolicy.WIDE });
