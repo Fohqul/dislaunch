@@ -158,10 +158,10 @@ class Release : Gtk.Box {
 		case "stable" :
 			bd_channel_row.selected = 0;
 			break;
-		case "canary" :
+		case "canary":
 			bd_channel_row.selected = 1;
 			break;
-			default : // formatter gonna format :thumbsup:
+		default: // formatter gonna format :thumbsup:
 			assert_not_reached ();
 		}
 		bd_apply_progress_row.progress_bar.visible = false;
@@ -176,8 +176,8 @@ class Release : Gtk.Box {
 		var text = state.process.error != "" ? "%s\n%s".printf (state.process.message, state.process.error) : state.process.message;
 
 		switch (state.process.status) {
-		case "download" :
-		case "install" :
+		case "download":
+		case "install":
 		case "update_check":
 			update_progress_row.progress_bar.progress = state.process.progress;
 			update_progress_row.progress_bar.text = text;
