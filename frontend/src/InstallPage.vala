@@ -34,7 +34,7 @@ class InstallPage : Adw.Bin {
 	}
 
 	private void refresh(ReleaseState? state) {
-		if (state == null || state.process.status == "") {
+		if (state == null || state.status == "") {
 			status_page.title = channel.title + " is not installed";
 			status_page.description = "";
 			status_page.icon_name = "system-software-install-symbolic";
@@ -43,9 +43,9 @@ class InstallPage : Adw.Bin {
 		}
 
 		status_page.title = "Installing " + channel.title;
-		status_page.description = state.process.error != "" ? "%s\n\n%s".printf(state.process.message, state.process.error) : state.process.message;
+		status_page.description = state.error != "" ? "%s\n\n%s".printf(state.message, state.error) : state.message;
 		status_page.paintable = spinner_paintable;
 		status_page.child = progress_bar;
-		progress_bar.progress = state.process.progress;
+		progress_bar.progress = state.progress;
 	}
 }

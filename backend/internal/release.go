@@ -282,21 +282,26 @@ func (release *release) takeOver() (*releaseInternal, func()) {
 	return nil, nil
 }
 
-type releaseProcessView struct {
+type ReleaseState struct {
 	Status   string `json:"status"`
 	Message  string `json:"message"`
 	Progress uint8  `json:"progress"`
 	Error    string `json:"error"`
-}
 
-type ReleaseState struct {
-	Internal *releaseInternal    `json:"internal,omitempty"`
-	Version  string              `json:"version"`
-	Process  *releaseProcessView `json:"process"`
+	Internal *releaseInternal `json:"internal,omitempty"`
+	Version  string           `json:"version"`
 }
 
 func (release *release) updateState() {
-	state := &ReleaseState{}
+	state := &ReleaseState{
+		Status:   string(release.status),
+		Message:  release.message,
+		Progress: release.progress,
+	}
+
+	if release.err != nil {
+		state.Error = release.err.Error()
+	}
 
 	if internal, err := release.getInternal(); err == nil {
 		state.Internal = &internal
@@ -304,15 +309,6 @@ func (release *release) updateState() {
 
 	if version, err := release.getVersion(); err == nil {
 		state.Version = version
-	}
-
-	state.Process = &releaseProcessView{
-		Status:   string(release.status),
-		Message:  release.message,
-		Progress: release.progress,
-	}
-	if release.err != nil {
-		state.Process.Error = release.err.Error()
 	}
 
 	release.state.Store(state)
@@ -360,7 +356,7 @@ func (release *release) getState() *ReleaseState {
 		return nil
 	}
 
-	if !release.isInstalled() && state.Process.Status == string(statusNone) {
+	if !release.isInstalled() && state.Status == string(statusNone) {
 		return nil
 	}
 

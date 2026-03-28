@@ -12,17 +12,14 @@ public struct ReleaseInternal {
 	string bd_channel;
 }
 
-public struct ReleaseProcess {
+public struct ReleaseState {
 	string status;
 	string message;
 	uint8 progress;
 	string error;
-}
 
-public struct ReleaseState {
 	ReleaseInternal? internal;
 	string version;
-	ReleaseProcess process;
 }
 
 public struct Configuration {
@@ -183,6 +180,18 @@ class Socket {
 
 		var object = release.get_object ();
 
+		// try {
+		state.status = parse_value (object.get_member ("status"), Type.STRING).get_string ();
+		state.message = parse_value (object.get_member ("message"), Type.STRING).get_string ();
+		var progress = parse_value (object.get_member ("progress"), Type.INT64).get_int64 ();
+		if (progress < uint8.MIN || progress > uint8.MAX)
+			throw new SocketError.INVALID_RESPONSE ("`progress` is not a valid uint8");
+		state.progress = (uint8) progress;
+		state.error = parse_value (object.get_member ("error"), Type.STRING).get_string ();
+		// } catch (Error e) {
+		// critical = e;
+		// }
+
 		if (object.has_member ("internal")) {
 			var release_internal = object.get_member ("internal");
 
@@ -212,24 +221,6 @@ class Socket {
 
 		// try {
 		state.version = parse_value (object.get_member ("version"), Type.STRING).get_string ();
-		// } catch (Error e) {
-		// critical = e;
-		// }
-
-		var process = object.get_member ("process");
-		if (process.get_node_type () != Json.NodeType.OBJECT)
-			throw new SocketError.INVALID_RESPONSE ("invalid process node type: %d", process.get_node_type ());
-
-		state.process = {};
-		var process_object = process.get_object ();
-		// try {
-		state.process.status = parse_value (process_object.get_member ("status"), Type.STRING).get_string ();
-		state.process.message = parse_value (process_object.get_member ("message"), Type.STRING).get_string ();
-		var progress = parse_value (process_object.get_member ("progress"), Type.INT64).get_int64 ();
-		if (progress < uint8.MIN || progress > uint8.MAX)
-			throw new SocketError.INVALID_RESPONSE ("`progress` is not a valid uint8");
-		state.process.progress = (uint8) progress;
-		state.process.error = parse_value (process_object.get_member ("error"), Type.STRING).get_string ();
 		// } catch (Error e) {
 		// critical = e;
 		// }

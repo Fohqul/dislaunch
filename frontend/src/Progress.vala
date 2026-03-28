@@ -143,16 +143,18 @@ class Progress : Adw.Application {
 		progress_bar = new ProgressBar ();
 		container.append (progress_bar);
 
-		refresh (ReleaseState () { process = ReleaseProcess () { progress = 65, message = "0" }, internal = ReleaseInternal () {} });
+		refresh (ReleaseState () { progress = 65, message = "0", internal = ReleaseInternal () {} });
 		view_stack.visible_child_name = "suspense";
 		application_window.present ();
-		// Socket.instance.state_sig.connect ((_, state) => refresh (channel.to_state (state.backend_state)));
-		new Thread<void> ("sid", () => {
-			for (uint8 i = 95; i < uint8.MAX; i++) {
-				Idle.add (() => { refresh (ReleaseState () { internal = ReleaseInternal () {}, process = ReleaseProcess () { progress = i, message = "%u".printf (i) } }); return Source.CONTINUE; });
-				Thread.usleep (600000);
-			}
-		});
+		Socket.instance.state_sig.connect ((_, state) => refresh (channel.to_state (state.backend_state)));
+		Socket.command ("state");
+		// new Thread<void> ("sid", () => {
+		// refresh (null);
+		//// for (uint8 i = 95; i <= uint8.MAX; i++) {
+		//// Idle.add (() => { refresh (ReleaseState () { internal = ReleaseInternal () {}, progress = i, message = "%u".printf (i) }); return Source.CONTINUE; });
+		//// Thread.usleep (150000);
+		//// }
+		// });
 	}
 
 	private bool should_append_message (string message) {
@@ -172,7 +174,7 @@ class Progress : Adw.Application {
 
 		view_stack.visible_child_name = "process";
 
-		switch (state.process.status) {
+		switch (state.status) {
 		case null :
 		case "" :
 			status.label = "Starting";
@@ -199,20 +201,20 @@ class Progress : Adw.Application {
 			view_stack.visible_child_name = "fatal";
 			break;
 		default:
-			stderr.printf ("Unrecognised status: %s\n", state.process.status);
+			stderr.printf ("Unrecognised status: %s\n", state.status);
 			break;
 		}
 
-		progress_bar.progress = state.process.progress;
+		progress_bar.progress = state.progress;
 
-		if (should_append_message (state.process.message))
-			messages.append (new Gtk.StringObject (state.process.message));
+		if (should_append_message (state.message))
+			messages.append (new Gtk.StringObject (state.message));
 
 
-		if (state.process.error != last_error) {
-			last_error = state.process.error;
-			if (state.process.error != null && state.process.error != "")
-				messages.insert (messages.n_items == 0 ? 0 : messages.n_items - 1, new Gtk.StringObject ("Error: " + state.process.error));
+		if (state.error != last_error) {
+			last_error = state.error;
+			if (state.error != null && state.error != "")
+				messages.insert (messages.n_items == 0 ? 0 : messages.n_items - 1, new Gtk.StringObject ("Error: " + state.error));
 		}
 	}
 }

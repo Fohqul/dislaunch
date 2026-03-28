@@ -169,31 +169,31 @@ class Release : Gtk.Box {
 
 		view_stack.visible_child_name = "preferences";
 
-		if (state.process.status == "")
+		if (state.status == "")
 			return;
 
 
-		var text = state.process.error != "" ? "%s\n%s".printf (state.process.message, state.process.error) : state.process.message;
+		var text = state.error != "" ? "%s\n%s".printf (state.message, state.error) : state.message;
 
-		switch (state.process.status) {
+		switch (state.status) {
 		case "download":
 		case "install":
 		case "update_check":
-			update_progress_row.progress_bar.progress = state.process.progress;
+			update_progress_row.progress_bar.progress = state.progress;
 			update_progress_row.progress_bar.text = text;
 			update_button.sensitive = false;
-			update_button.label = state.process.status == "update_check" ? "Checking…" : "Updating…";
+			update_button.label = state.status == "update_check" ? "Checking…" : "Updating…";
 			break;
 		case "bd_injection":
-			bd_apply_progress_row.progress_bar.progress = state.process.progress;
+			bd_apply_progress_row.progress_bar.progress = state.progress;
 			bd_apply_progress_row.progress_bar.text = text;
 			break;
 		case "move":
-			install_path_progress_row.progress_bar.progress = state.process.progress;
+			install_path_progress_row.progress_bar.progress = state.progress;
 			install_path_progress_row.progress_bar.text = text;
 			break;
 		case "uninstall":
-			uninstall_progress_row.progress_bar.progress = state.process.progress;
+			uninstall_progress_row.progress_bar.progress = state.progress;
 			uninstall_progress_row.progress_bar.text = text;
 			uninstall_button.sensitive = false;
 			uninstall_button.label = "Uninstalling…";
@@ -202,7 +202,7 @@ class Release : Gtk.Box {
 			view_stack.visible_child_name = "recover";
 			return;
 		default:
-			stderr.printf ("Unrecognised status: %s\n", state.process.status);
+			stderr.printf ("Unrecognised status: %s\n", state.status);
 			break;
 		}
 	}
