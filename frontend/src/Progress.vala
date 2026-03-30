@@ -188,7 +188,7 @@ class Progress : Adw.Application {
 
 		switch (release_state.status) {
 		case null :
-		case "" :
+		case "":
 			status.label = "Starting";
 			break;
 		case "download":
@@ -221,7 +221,6 @@ class Progress : Adw.Application {
 
 		if (should_append_message (release_state.message))
 			messages.append (new Gtk.StringObject (release_state.message));
-
 
 		if (release_state.error != last_error) {
 			last_error = release_state.error;
