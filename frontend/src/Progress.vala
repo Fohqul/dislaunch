@@ -106,6 +106,8 @@ class Progress : Adw.Application {
 
 		view_stack.add_named (SuspensePageFactory.create ("Launching " + channel.title + "…"), "suspense");
 
+		view_stack.add_named (new SocketPage (), "socket");
+
 		view_stack.add_named (new InstallPage (channel), "install");
 
 		var container = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
@@ -143,11 +145,14 @@ class Progress : Adw.Application {
 		progress_bar = new ProgressBar ();
 		container.append (progress_bar);
 
-		refresh (ReleaseState () { progress = 65, message = "0", internal = ReleaseInternal () {} });
 		view_stack.visible_child_name = "suspense";
 		application_window.present ();
-		Socket.instance.state_sig.connect ((_, state) => refresh (channel.to_state (state.backend_state)));
 		Socket.command ("state");
+		refresh (Socket.get_state ());
+		Socket.instance.state_sig.connect ((_, state) => Idle.add (() => {
+			refresh (state);
+			return Source.REMOVE;
+		}));
 		// new Thread<void> ("sid", () => {
 		// refresh (null);
 		//// for (uint8 i = 95; i <= uint8.MAX; i++) {
@@ -166,15 +171,22 @@ class Progress : Adw.Application {
 		return message != last_message.string;
 	}
 
-	private void refresh (ReleaseState? state) {
-		if (state == null || state.version == "" || state.internal == null) {
+	private void refresh (SocketState state) {
+		if (state.critical != null || state.waiting != null) {
+			view_stack.visible_child_name = "socket";
+			return;
+		}
+
+		var release_state = channel.to_state (state.backend_state);
+
+		if (release_state == null || release_state.version == "" || release_state.internal == null) {
 			view_stack.visible_child_name = "install";
 			return;
 		}
 
 		view_stack.visible_child_name = "process";
 
-		switch (state.status) {
+		switch (release_state.status) {
 		case null :
 		case "" :
 			status.label = "Starting";
@@ -201,20 +213,20 @@ class Progress : Adw.Application {
 			view_stack.visible_child_name = "fatal";
 			break;
 		default:
-			stderr.printf ("Unrecognised status: %s\n", state.status);
+			stderr.printf ("Unrecognised status: %s\n", release_state.status);
 			break;
 		}
 
-		progress_bar.progress = state.progress;
+		progress_bar.progress = release_state.progress;
 
-		if (should_append_message (state.message))
-			messages.append (new Gtk.StringObject (state.message));
+		if (should_append_message (release_state.message))
+			messages.append (new Gtk.StringObject (release_state.message));
 
 
-		if (state.error != last_error) {
-			last_error = state.error;
-			if (state.error != null && state.error != "")
-				messages.insert (messages.n_items == 0 ? 0 : messages.n_items - 1, new Gtk.StringObject ("Error: " + state.error));
+		if (release_state.error != last_error) {
+			last_error = release_state.error;
+			if (release_state.error != null && release_state.error != "")
+				messages.insert (messages.n_items == 0 ? 0 : messages.n_items - 1, new Gtk.StringObject ("Error: " + release_state.error));
 		}
 	}
 }
