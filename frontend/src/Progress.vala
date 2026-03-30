@@ -104,7 +104,7 @@ class Progress : Adw.Application {
 		view_stack = new Adw.ViewStack ();
 		application_window.content = view_stack;
 
-		view_stack.add_named (SuspensePageFactory.create ("Launching…"), "suspense");
+		view_stack.add_named (SuspensePageFactory.create ("Launching " + channel.title + "…"), "suspense");
 
 		view_stack.add_named (new InstallPage (channel), "install");
 
