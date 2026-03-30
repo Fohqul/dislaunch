@@ -27,10 +27,7 @@ class InstallPage : Adw.Bin {
 
 		progress_bar = new ProgressBar();
 
-		Socket.instance.state_sig.connect((_, socket_state) => Idle.add(() => {
-			refresh(channel.to_state(socket_state.backend_state));
-			return Source.REMOVE;
-		}));
+		Socket.on_state((state) => refresh(channel.to_state(state.backend_state)));
 	}
 
 	private void refresh(ReleaseState? state) {

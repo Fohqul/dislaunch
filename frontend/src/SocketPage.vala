@@ -22,10 +22,7 @@ class SocketPage : Adw.Bin {
 		reset_button.clicked.connect(() => Socket.start());
 
 		refresh(Socket.get_state());
-		Socket.instance.state_sig.connect((_, state) => Idle.add(() => {
-			refresh(state);
-			return Source.REMOVE;
-		}));
+		Socket.on_state(refresh);
 	}
 
 	private void refresh(SocketState state) {

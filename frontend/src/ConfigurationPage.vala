@@ -47,7 +47,7 @@ class ConfigurationPage : Adw.PreferencesPage {
 		};
 		preferences_group.add (default_install_path_row);
 
-		Socket.instance.state_sig.connect ((_, state) => Idle.add (() => {
+		Socket.on_state ((state) => {
 			Configuration config = state.backend_state.config;
 			automatically_check_for_updates_switch.state = config.automatically_check_for_updates;
 			automatically_check_for_updates_switch.active = config.automatically_check_for_updates;
@@ -56,7 +56,6 @@ class ConfigurationPage : Adw.PreferencesPage {
 			automatically_install_updates_switch.state = config.automatically_install_updates;
 			automatically_install_updates_switch.active = config.automatically_install_updates;
 			default_install_path_row.text = config.default_install_path == null ? "" : config.default_install_path;
-			return Source.REMOVE;
-		}));
+		});
 	}
 }

@@ -51,10 +51,10 @@ public errordomain SocketError {
 }
 
 class Socket {
-	public delegate void UpdateStateCallback (Socket socket, SocketState state);
+	public delegate void UpdateStateCallback (SocketState state);
 
 	private static Socket _instance;
-	public static Socket instance {
+	private static Socket instance {
 		get {
 			if (_instance == null)
 				_instance = new Socket ();
@@ -65,6 +65,13 @@ class Socket {
 
 	public static SocketState get_state () {
 		return instance.state;
+	}
+
+	public static void on_state (UpdateStateCallback callback) {
+		instance.state_sig.connect ((_, state) => Idle.add (() => {
+			callback (state);
+			return Source.REMOVE;
+		}));
 	}
 
 	public static void start () {
@@ -153,7 +160,7 @@ class Socket {
 		}
 	}
 
-	public signal void state_sig (SocketState state);
+	private signal void state_sig (SocketState state);
 
 	private Socket () {}
 

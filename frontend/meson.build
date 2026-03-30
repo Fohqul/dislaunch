@@ -13,6 +13,7 @@ executable(
 		'src/Release.vala',
 		'src/ReleaseChannel.vala',
 		'src/Socket.vala',
+		'src/SocketPage.vala',
 		'src/SuspensePageFactory.vala',
 	),
 	dependencies: [

@@ -149,10 +149,7 @@ class Progress : Adw.Application {
 		application_window.present ();
 		Socket.command ("state");
 		refresh (Socket.get_state ());
-		Socket.instance.state_sig.connect ((_, state) => Idle.add (() => {
-			refresh (state);
-			return Source.REMOVE;
-		}));
+		Socket.on_state (refresh);
 		// new Thread<void> ("sid", () => {
 		// refresh (null);
 		//// for (uint8 i = 95; i <= uint8.MAX; i++) {

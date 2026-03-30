@@ -159,10 +159,7 @@ class Application : Adw.Application {
 		view_stack.visible_child_name = "socket";
 		refresh ({ {}, "Starting", null, null });
 		application_window.present ();
-		Socket.instance.state_sig.connect ((_, state) => Idle.add (() => {
-			refresh (state);
-			return Source.REMOVE;
-		}));
+		Socket.on_state (refresh);
 		Socket.start ();
 		Socket.command ("state");
 	}

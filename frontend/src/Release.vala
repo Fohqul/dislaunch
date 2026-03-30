@@ -113,10 +113,7 @@ class Release : Gtk.Box {
 		bd_preferences_group.add (bd_apply_progress_row);
 
 		view_stack.visible_child_name = "preferences";
-		Socket.instance.state_sig.connect ((_, state) => Idle.add (() => {
-			refresh (channel.to_state (state.backend_state));
-			return Source.REMOVE;
-		}));
+		Socket.on_state ((state) => refresh (channel.to_state (state.backend_state)));
 	}
 
 	private void refresh (ReleaseState? state) {
