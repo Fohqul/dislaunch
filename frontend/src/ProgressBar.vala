@@ -1,4 +1,4 @@
-class ProgressBar : Gtk.Widget {
+class ProgressBar : Adw.Bin {
 	private static string css = """
 	progressbar trough, progressbar progress {
 		min-height: 1.25em;
@@ -49,7 +49,7 @@ class ProgressBar : Gtk.Widget {
 		Css.add(css, Gtk.STYLE_PROVIDER_PRIORITY_USER);
 
 		progress_bar = new Gtk.ProgressBar() { show_text = true };
-		progress_bar.set_parent(this);
+		child = progress_bar;
 
 		Timeout.add(200, () => {
 			if (visible && progress > 100)
@@ -57,10 +57,6 @@ class ProgressBar : Gtk.Widget {
 
 			return Source.CONTINUE;
 		});
-	}
-
-	static construct {
-		set_layout_manager_type(typeof (Gtk.BinLayout));
 	}
 
 	private void update_text() {
