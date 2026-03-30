@@ -96,7 +96,7 @@ class Progress : Adw.Application {
 
 		var application_window = new Adw.ApplicationWindow (this) {
 			title = "Dislaunch: " + channel.title + " Progress",
-			default_height = 350,
+			default_height = 450,
 			default_width = 550,
 			resizable = false
 		};

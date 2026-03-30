@@ -54,7 +54,8 @@ class SocketPage : Adw.Bin {
 					break;
 				}
 			}
-			status_page.description = "Dislaunch encountered an error connecting to the backend: %s\n\n%s".printf(state.critical.message, comment);
+
+			status_page.description = comment == "" ? "Dislaunch encountered an error connecting to the backend: " + state.critical.message : "Dislaunch encountered an error connecting to the backend: %s\n\n%s".printf(state.critical.message, comment);
 			status_page.child = reset_button;
 		} else if (state.waiting != null) {
 			status_page.title = "Waiting…";
