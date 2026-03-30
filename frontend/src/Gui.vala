@@ -12,10 +12,12 @@ int launch (ReleaseChannel channel) {
 	new Progress (channel).run ();
 	// }
 
-	var path_name = "Discord";
-	if (channel == ReleaseChannel.PTB)
+	string path_name;
+	if (channel == ReleaseChannel.STABLE)
+		path_name = "Discord";
+	else if (channel == ReleaseChannel.PTB)
 		path_name = "DiscordPTB";
-	else if (channel == ReleaseChannel.CANARY)
+	else
 		path_name = "DiscordCanary";
 
 	var executable = "%s/%s/%s".printf (state.internal.install_path, path_name, path_name);
