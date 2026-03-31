@@ -52,3 +52,7 @@ meson compile -C builddir
 ```
 
 This produces 2 executables, both under `builddir/frontend`: `dislaunch` and `dislaunchctl`. For technical reasons, the former must be placed in `~/.local/bin` (the backend makes this assumption when generating the `.desktop` entries, this should probably be changed.) The latter is an optional extra, and you can do whatever you want with it (including not using it at all.)
+
+## AI declaration
+
+Throughout this project (including the old [`discord-linux-updater`](https://github.com/Fohqul/discord-linux-updater)), I've used ChatGPT for debugging and as a learning aid or for suggestions, ideas and reviews (e.g. I only know that IPC and UNIX sockets are a thing thanks to it). Sometimes I’ve also used ChatGPT when I was really stuck on how to solve a specific problem. All that said, I write all the code and consider it my work.
