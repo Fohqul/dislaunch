@@ -36,6 +36,7 @@ class Application : Adw.Application {
 	private Adw.ViewStack view_stack;
 	private Gtk.Revealer release_alert_revealer;
 	private Gtk.Label release_alert_label;
+	private SimpleAction configuration_action;
 
 	public Application () {
 		Object (application_id: "io.github.Fohqul.Dislaunch", flags: ApplicationFlags.DEFAULT_FLAGS);
@@ -144,8 +145,10 @@ class Application : Adw.Application {
 
 		view_stack.add_named (new SocketPage (), "socket");
 
+		configuration_action = new SimpleAction ("configuration", null);
+		configuration_action.activate.connect (() => configuration_dialogue.present (application_window));
+
 		add_action_entries ({
-			{ "configuration", () => configuration_dialogue.present (application_window) },
 			{ "about", () =>
 			  Adw.show_about_dialog (
 				                 application_window,
@@ -166,9 +169,14 @@ class Application : Adw.Application {
 
 	private void refresh (SocketState state) {
 		if (state.critical != null || state.waiting != null) {
+			if (configuration_dialogue.parent != null)
+				configuration_dialogue.close ();
+			remove_action ("configuration");
 			view_stack.visible_child_name = "socket";
 			return;
 		}
+
+		add_action (configuration_action);
 
 		if (state.error != null) {
 			release_alert_revealer.reveal_child = true;
