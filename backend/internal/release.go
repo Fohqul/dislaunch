@@ -288,7 +288,7 @@ type ReleaseState struct {
 	Progress uint8  `json:"progress"`
 	Error    string `json:"error"`
 
-	Internal *releaseInternal `json:"internal,omitempty"`
+	Internal *releaseInternal `json:"internal"`
 	Version  string           `json:"version"`
 }
 

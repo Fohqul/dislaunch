@@ -164,7 +164,27 @@ class Socket {
 
 	private Socket () {}
 
-	private Value parse_value (Json.Node node, Type type) throws SocketError {
+	private Value parse_value (Json.Object object, string member, Type type) throws SocketError {
+		if (!object.has_member (member)) {
+			var value = Value (type);
+			switch (type) {
+			case Type.BOOLEAN :
+				value.set_boolean (false);
+				break;
+			case Type.INT64 :
+				value.set_int64 (0);
+				break;
+			case Type.STRING :
+				value.set_string ("");
+				break;
+				default :
+				// unimplemented
+				assert_not_reached ();
+			}
+			return value;
+		}
+
+		var node = object.get_member (member);
 		if (node.get_node_type () != Json.NodeType.VALUE)
 			throw new SocketError.INVALID_RESPONSE ("not a value: %d", node.get_node_type ());
 		if (node.get_value_type () != type)
@@ -188,19 +208,19 @@ class Socket {
 		var object = release.get_object ();
 
 		// try {
-		state.status = parse_value (object.get_member ("status"), Type.STRING).get_string ();
-		state.message = parse_value (object.get_member ("message"), Type.STRING).get_string ();
-		var progress = parse_value (object.get_member ("progress"), Type.INT64).get_int64 ();
+		state.status = parse_value (object, "status", Type.STRING).get_string ();
+		state.message = parse_value (object, "message", Type.STRING).get_string ();
+		var progress = parse_value (object, "progress", Type.INT64).get_int64 ();
 		if (progress < uint8.MIN || progress > uint8.MAX)
 			throw new SocketError.INVALID_RESPONSE ("`progress` is not a valid uint8");
 		state.progress = (uint8) progress;
-		state.error = parse_value (object.get_member ("error"), Type.STRING).get_string ();
+		state.error = parse_value (object, "error", Type.STRING).get_string ();
 		// } catch (Error e) {
 		// critical = e;
 		// }
 
 		// try {
-		state.version = parse_value (object.get_member ("version"), Type.STRING).get_string ();
+		state.version = parse_value (object, "version", Type.STRING).get_string ();
 		// } catch (Error e) {
 		// critical = e;
 		// }
@@ -219,15 +239,15 @@ class Socket {
 		state.internal = {};
 		var internal_object = release_internal.get_object ();
 		// try {
-		state.internal.install_path = parse_value (internal_object.get_member ("install_path"), Type.STRING).get_string ();
-		var last_checked = parse_value (internal_object.get_member ("last_checked"), Type.STRING).get_string ();
+		state.internal.install_path = parse_value (internal_object, "install_path", Type.STRING).get_string ();
+		var last_checked = parse_value (internal_object, "last_checked", Type.STRING).get_string ();
 		state.internal.last_checked = new DateTime.from_iso8601 (last_checked, null);
 		if (state.internal.last_checked == null)
 			throw new SocketError.INVALID_RESPONSE ("`last_checked` is not a valid DateTime: %s", last_checked);
-		state.internal.latest_version = parse_value (internal_object.get_member ("latest_version"), Type.STRING).get_string ();
-		state.internal.command_line_arguments = parse_value (internal_object.get_member ("command_line_arguments"), Type.STRING).get_string ();
-		state.internal.bd_enabled = parse_value (internal_object.get_member ("bd_enabled"), Type.BOOLEAN).get_boolean ();
-		var bd_channel = parse_value (internal_object.get_member ("bd_channel"), Type.STRING).get_string ();
+		state.internal.latest_version = parse_value (internal_object, "latest_version", Type.STRING).get_string ();
+		state.internal.command_line_arguments = parse_value (internal_object, "command_line_arguments", Type.STRING).get_string ();
+		state.internal.bd_enabled = parse_value (internal_object, "bd_enabled", Type.BOOLEAN).get_boolean ();
+		var bd_channel = parse_value (internal_object, "bd_channel", Type.STRING).get_string ();
 		if (bd_channel != "stable" && bd_channel != "canary")
 			throw new SocketError.INVALID_RESPONSE ("invalid BetterDiscord channel: %s", bd_channel);
 		state.internal.bd_channel = bd_channel;
@@ -257,10 +277,10 @@ class Socket {
 
 			backend_state.config = {};
 			var config_object = config.get_object ();
-			backend_state.config.automatically_check_for_updates = parse_value (config_object.get_member ("automatically_check_for_updates"), Type.BOOLEAN).get_boolean ();
-			backend_state.config.notify_on_update_available = parse_value (config_object.get_member ("notify_on_update_available"), Type.BOOLEAN).get_boolean ();
-			backend_state.config.automatically_install_updates = parse_value (config_object.get_member ("automatically_install_updates"), Type.BOOLEAN).get_boolean ();
-			backend_state.config.default_install_path = parse_value (config_object.get_member ("default_install_path"), Type.STRING).get_string ();
+			backend_state.config.automatically_check_for_updates = parse_value (config_object, "automatically_check_for_updates", Type.BOOLEAN).get_boolean ();
+			backend_state.config.notify_on_update_available = parse_value (config_object, "notify_on_update_available", Type.BOOLEAN).get_boolean ();
+			backend_state.config.automatically_install_updates = parse_value (config_object, "automatically_install_updates", Type.BOOLEAN).get_boolean ();
+			backend_state.config.default_install_path = parse_value (config_object, "default_install_path", Type.STRING).get_string ();
 
 			lock (state) {
 				state.backend_state = backend_state;

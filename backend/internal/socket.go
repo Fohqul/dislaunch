@@ -256,9 +256,9 @@ func StartListener() (func(), error) {
 }
 
 type BackendState struct {
-	Stable        *ReleaseState `json:"stable,omitempty"`
-	Ptb           *ReleaseState `json:"ptb,omitempty"`
-	Canary        *ReleaseState `json:"canary,omitempty"`
+	Stable        *ReleaseState `json:"stable"`
+	Ptb           *ReleaseState `json:"ptb"`
+	Canary        *ReleaseState `json:"canary"`
 	Configuration Configuration `json:"config"`
 }
 
@@ -272,7 +272,7 @@ func broadcastBackendState() {
 		Ptb:           ptb.getState(),
 		Canary:        canary.getState(),
 		Configuration: getConfiguration(),
-	})
+	}, json.OmitZeroStructFields(true))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error marshalling backend state to JSON: %s\n", err)
 		return
