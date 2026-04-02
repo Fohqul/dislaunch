@@ -312,7 +312,7 @@ func (release *release) updateState() {
 	}
 
 	release.state.Store(state)
-	go broadcastBackendState()
+	broadcastBackendState()
 }
 
 func (release *release) resetState() {
