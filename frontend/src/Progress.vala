@@ -184,7 +184,6 @@ class Progress : Adw.Application {
 		view_stack.visible_child_name = "process";
 
 		switch (release_state.status) {
-		case null :
 		case "":
 			status.label = "Starting";
 			break;
