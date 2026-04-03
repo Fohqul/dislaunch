@@ -32,7 +32,7 @@ int launch (ReleaseChannel channel) {
 
 	var argv = new string[command_line_arguments.length + 1];
 	argv[0] = executable;
-	for (int i = 0; i < command_line_arguments.length; ++i)
+	for (size_t i = 0; i < command_line_arguments.length; ++i)
 		argv[i + 1] = command_line_arguments[i];
 
 	Posix.execv (executable, argv);
