@@ -336,10 +336,8 @@ class Socket {
 		try {
 			var err = "";
 			Process.spawn_command_line_sync ("dislaunchd path", out path, out err);
-			if (err != "") {
-				critical = new SocketError.DAEMON_ERROR ("daemon encountered error while getting path: %s", err);
-				return;
-			}
+			if (err != "")
+				throw new SocketError.DAEMON_ERROR ("daemon encountered error while getting path: %s", err);
 		} catch (Error e) {
 			critical = e;
 			return;
