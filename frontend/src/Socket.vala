@@ -340,7 +340,7 @@ class Socket {
 				critical = new SocketError.DAEMON_ERROR ("daemon encountered error while getting path: %s", err);
 				return;
 			}
-		} catch (SpawnError e) {
+		} catch (Error e) {
 			critical = e;
 			return;
 		}
