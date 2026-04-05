@@ -4,8 +4,7 @@ class SuspensePageFactory {
 			title = title
 		};
 
-		var spinner_paintable = new Adw.SpinnerPaintable(status_page);
-		status_page.paintable = spinner_paintable;
+		status_page.paintable = new Adw.SpinnerPaintable(status_page);
 
 		return status_page;
 	}
