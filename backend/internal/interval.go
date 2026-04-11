@@ -19,9 +19,9 @@ func runInterval(configuration Configuration, release *release) {
 	if configuration.NotifyOnUpdateAvailable {
 		message := "There's an update available for Discord."
 		switch release {
-		case &ptb:
+		case ptb:
 			message = "There's an update available for Discord PTB."
-		case &canary:
+		case canary:
 			message = "There's an update available for Discord Canary."
 		}
 		if err := beeep.Notify("Update available", message, "software-update-available"); err != nil {
@@ -43,7 +43,7 @@ func startIntervals() {
 		}
 
 		var wg sync.WaitGroup
-		for _, release := range []*release{&stable, &ptb, &canary} {
+		for _, release := range []*release{getStable(), getPtb(), getCanary()} {
 			wg.Go(func() {
 				runInterval(configuration, release)
 			})
