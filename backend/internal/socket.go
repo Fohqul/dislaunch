@@ -114,11 +114,11 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 			case "state":
 				go broadcastBackendState()
 			case "stable":
-				go releaseCommand(&stable, data, command)
+				go releaseCommand(getStable(), data, command)
 			case "ptb":
-				go releaseCommand(&ptb, data, command)
+				go releaseCommand(getPtb(), data, command)
 			case "canary":
-				go releaseCommand(&canary, data, command)
+				go releaseCommand(getCanary(), data, command)
 			case "config":
 				var argument string
 				if len(command) > 2 {
@@ -268,9 +268,9 @@ func broadcastBackendState() {
 	}
 
 	buffer, err := json.Marshal(BackendState{
-		Stable:        stable.getState(),
-		Ptb:           ptb.getState(),
-		Canary:        canary.getState(),
+		Stable:        getStable().getState(),
+		Ptb:           getPtb().getState(),
+		Canary:        getCanary().getState(),
 		Configuration: getConfiguration(),
 	}, json.OmitZeroStructFields(true))
 	if err != nil {

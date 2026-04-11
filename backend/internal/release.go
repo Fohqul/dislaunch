@@ -84,6 +84,9 @@ const (
 // such as `status`, `message`, `progress` and `err`.
 
 type release struct {
+	id       string
+	pathName string
+
 	mu       sync.Mutex
 	status   status // currently active process
 	message  string
@@ -92,7 +95,38 @@ type release struct {
 	state    atomic.Value
 }
 
-var stable, ptb, canary release
+var stable, ptb, canary *release
+
+func newRelease(id string, pathName string) *release {
+	release := &release{id: id, pathName: pathName}
+
+	release.mu.Lock()
+	defer release.mu.Unlock()
+	release.updateState(false)
+
+	return release
+}
+
+func getStable() *release {
+	if stable == nil {
+		stable = newRelease("stable", "Discord")
+	}
+	return stable
+}
+
+func getPtb() *release {
+	if ptb == nil {
+		ptb = newRelease("ptb", "DiscordPTB")
+	}
+	return ptb
+}
+
+func getCanary() *release {
+	if canary == nil {
+		canary = newRelease("canary", "DiscordCanary")
+	}
+	return canary
+}
 
 type bdChannel string
 
@@ -111,35 +145,11 @@ type releaseInternal struct {
 }
 
 func (release *release) String() string {
-	switch release {
-	case &stable:
-		return "stable"
-	case &ptb:
-		return "ptb"
-	case &canary:
-		return "canary"
-	}
-
-	log.Fatalf("unknown release: %p\n", release)
-	return ""
-}
-
-func (release *release) pathName() string {
-	switch release {
-	case &stable:
-		return "Discord"
-	case &ptb:
-		return "DiscordPTB"
-	case &canary:
-		return "DiscordCanary"
-	}
-
-	log.Fatalf("unknown release: %p\n", release)
-	return ""
+	return release.id
 }
 
 func (release *release) getGobPath() string {
-	return filepath.Join(getHomeXdgDislaunchDirectory("XDG_STATE_HOME", filepath.Join(".local", "state")), release.String()+".gob")
+	return filepath.Join(getHomeXdgDislaunchDirectory("XDG_STATE_HOME", filepath.Join(".local", "state")), release.id+".gob")
 }
 
 func (release *release) isInstalled() bool {
@@ -178,7 +188,7 @@ func (release *release) openGob(flag int) (*os.File, func()) {
 		release.status = statusFatal
 		release.message = "Failed to open internal release data"
 		release.err = err
-		release.updateState()
+		release.updateState(true)
 		return nil, nil
 	}
 	return file, func() {
@@ -225,7 +235,7 @@ func (release *release) setInternal(internal *releaseInternal) error {
 		release.status = statusFatal
 		release.message = "Failed to encode internal data"
 		release.err = err
-		release.updateState()
+		release.updateState(true)
 		return err
 	}
 	return nil
@@ -243,7 +253,7 @@ func (release *release) getVersion() (string, error) {
 		return "", err
 	}
 
-	file, err := os.Open(filepath.Join(internal.InstallPath, release.pathName(), "resources", "build_info.json"))
+	file, err := os.Open(filepath.Join(internal.InstallPath, release.pathName, "resources", "build_info.json"))
 	if err != nil {
 		return "", err
 	}
@@ -256,7 +266,7 @@ func (release *release) getVersion() (string, error) {
 	if err = json.UnmarshalRead(file, &buildInfo); err != nil {
 		return "", err
 	}
-	if buildInfo.ReleaseChannel != release.String() {
+	if buildInfo.ReleaseChannel != release.id {
 		release.status = statusFatal
 		release.message = "Release is installed, but it reports an unexpected release channel"
 		release.err = fmt.Errorf("mismatched release channel: %s", buildInfo.ReleaseChannel)
@@ -292,7 +302,7 @@ type ReleaseState struct {
 	Version  string           `json:"version"`
 }
 
-func (release *release) updateState() {
+func (release *release) updateState(broadcast bool) {
 	state := &ReleaseState{
 		Status:   string(release.status),
 		Message:  release.message,
@@ -312,7 +322,9 @@ func (release *release) updateState() {
 	}
 
 	release.state.Store(state)
-	broadcastBackendState()
+	if broadcast {
+		broadcastBackendState()
+	}
 }
 
 func (release *release) resetState() {
@@ -324,7 +336,7 @@ func (release *release) resetState() {
 	release.message = ""
 	release.progress = 0
 	release.err = nil
-	release.updateState()
+	release.updateState(true)
 }
 
 func (release *release) getState() *ReleaseState {
@@ -340,12 +352,7 @@ func (release *release) getState() *ReleaseState {
 	value := release.state.Load()
 
 	if value == nil {
-		go func() {
-			// TODO there should be a better mechanism than this for automatically loading in the value without the need for a process
-			release.mu.Lock()
-			defer release.mu.Unlock()
-			release.updateState()
-		}()
+		log.Fatalf("%s has a nil `state`\n", release.id)
 		return nil
 	}
 
@@ -420,12 +427,12 @@ func (release *release) checkForUpdates() {
 	release.status = statusUpdateCheck
 	release.message = "Checking for updates"
 	release.progress = 101
-	release.updateState()
+	release.updateState(true)
 
 	var buffer bytes.Buffer
-	if err := download("https://discord.com/api/"+release.String()+"/updates?platform=linux", &buffer, nil); err != nil {
+	if err := download("https://discord.com/api/"+release.id+"/updates?platform=linux", &buffer, nil); err != nil {
 		release.err = fmt.Errorf("error downloading latest version info: %w", err)
-		release.updateState()
+		release.updateState(true)
 		return
 	}
 
@@ -435,7 +442,7 @@ func (release *release) checkForUpdates() {
 	}
 	if err := json.UnmarshalRead(&buffer, &latestVersion); err != nil {
 		release.err = fmt.Errorf("error decoding latest version info: %w", err)
-		release.updateState()
+		release.updateState(true)
 		return
 	}
 
@@ -465,7 +472,7 @@ func (release *release) install() {
 	version, err := release.getVersion()
 	if installed && err != nil {
 		release.err = fmt.Errorf("error getting installed version: %w", err)
-		release.updateState()
+		release.updateState(true)
 		return
 	}
 	if installed && version == internal.LatestVersion {
@@ -473,9 +480,9 @@ func (release *release) install() {
 	}
 
 	release.status = statusInstall
-	release.updateState()
+	release.updateState(true)
 
-	tarballPath := filepath.Join(getHomeXdgDislaunchDirectory("XDG_CACHE_HOME", ".cache"), release.String())
+	tarballPath := filepath.Join(getHomeXdgDislaunchDirectory("XDG_CACHE_HOME", ".cache"), release.id)
 	if installed {
 		tarballPath += "-" + internal.LatestVersion
 	}
@@ -484,21 +491,21 @@ func (release *release) install() {
 	if _, err = os.Stat(tarballPath); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			release.err = fmt.Errorf("error getting stat of tarball download path: %w", err)
-			release.updateState()
+			release.updateState(true)
 			return
 		}
 
 		downloadPath := tarballPath + ".part"
 		if err = os.Remove(downloadPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 			release.err = fmt.Errorf("error deleting previous partially downloaded tarball at '%s': %w", downloadPath, err)
-			release.updateState()
+			release.updateState(true)
 			return
 		}
 
 		file, err := os.OpenFile(downloadPath, os.O_CREATE|os.O_RDWR, 0600)
 		if err != nil {
 			release.err = fmt.Errorf("error opening tarball download path: %w", err)
-			release.updateState()
+			release.updateState(true)
 			return
 		}
 		defer file.Close()
@@ -508,18 +515,18 @@ func (release *release) install() {
 		} else {
 			release.message = "Downloading latest version"
 		}
-		if err = download("https://discord.com/api/download/"+release.String()+"?platform=linux&format=tar.gz", file, func(progress uint8) {
+		if err = download("https://discord.com/api/download/"+release.id+"?platform=linux&format=tar.gz", file, func(progress uint8) {
 			release.progress = progress
-			release.updateState()
+			release.updateState(true)
 		}); err != nil {
 			release.err = fmt.Errorf("error downloading %s %s: %w", release, internal.LatestVersion, err)
-			release.updateState()
+			release.updateState(true)
 			return // todo handle temporary/recoverable errors
 		}
 
 		if err = os.Rename(downloadPath, tarballPath); err != nil {
 			release.err = fmt.Errorf("error renaming downloaded tarball: %w", err)
-			release.updateState()
+			release.updateState(true)
 			return
 		}
 	}
@@ -532,30 +539,30 @@ func (release *release) install() {
 		}
 	}
 	if installed {
-		installRealpath, err := filepath.EvalSymlinks(filepath.Join(installPath, release.pathName()))
+		installRealpath, err := filepath.EvalSymlinks(filepath.Join(installPath, release.pathName))
 		if err != nil {
-			release.err = fmt.Errorf("error getting realpath of install path '%s': %w", filepath.Join(installRealpath, release.pathName()), err)
-			release.updateState()
+			release.err = fmt.Errorf("error getting realpath of install path '%s': %w", filepath.Join(installRealpath, release.pathName), err)
+			release.updateState(true)
 			return
 		}
 		processes, err := process.Processes()
 		if err != nil {
 			release.err = fmt.Errorf("error getting running processes: %w", err)
-			release.updateState()
+			release.updateState(true)
 			return
 		}
 		for _, process := range processes {
 			exe, err := process.Exe()
 			if err != nil {
 				release.err = fmt.Errorf("error getting executable of running process: %w", err)
-				release.updateState()
+				release.updateState(true)
 				continue
 			}
 
 			exeRealpath, err := filepath.EvalSymlinks(exe)
 			if err != nil {
 				release.err = fmt.Errorf("error getting realpath of executable '%s': %w", exe, err)
-				release.updateState()
+				release.updateState(true)
 				continue
 			}
 
@@ -570,7 +577,7 @@ func (release *release) install() {
 	tarball, err := os.Open(tarballPath)
 	if err != nil {
 		release.err = fmt.Errorf("error opening tarball: %w", err)
-		release.updateState()
+		release.updateState(true)
 		return
 	}
 
@@ -578,18 +585,18 @@ func (release *release) install() {
 		// Even if extraction failed, that implies a possibly corrupted tarball, so still remove it
 		if err = os.Remove(tarballPath); err != nil {
 			release.err = fmt.Errorf("error deleting tarball: %w", err)
-			release.updateState()
+			release.updateState(true)
 		}
 	}()
 
 	var desktopEntry bytes.Buffer
 	var desktopFileName string
 	switch release {
-	case &stable:
+	case stable:
 		desktopFileName = "discord.desktop"
-	case &ptb:
+	case ptb:
 		desktopFileName = "discord-ptb.desktop"
-	case &canary:
+	case canary:
 		desktopFileName = "discord-canary.desktop"
 	default:
 		log.Fatalf("unknown release: %p", release)
@@ -605,7 +612,7 @@ func (release *release) install() {
 		if info.IsDir() {
 			if err = os.MkdirAll(filepath.Join(installPath, info.NameInArchive), info.Mode().Perm()); err != nil {
 				release.err = fmt.Errorf("error creating extracted directory '%s': %w", info.NameInArchive, err)
-				release.updateState()
+				release.updateState(true)
 				return err
 			}
 			return nil
@@ -614,7 +621,7 @@ func (release *release) install() {
 		source, err := info.Open()
 		if err != nil {
 			release.err = fmt.Errorf("error opening extracted file '%s': %w", info.NameInArchive, err)
-			release.updateState()
+			release.updateState(true)
 			return err
 		}
 		defer source.Close()
@@ -622,7 +629,7 @@ func (release *release) install() {
 		destination, err := os.OpenFile(filepath.Join(installPath, info.NameInArchive), os.O_CREATE|os.O_WRONLY, info.Mode().Perm())
 		if err != nil {
 			release.err = fmt.Errorf("error opening destination file '%s': %w", filepath.Join(installPath, info.NameInArchive), err)
-			release.updateState()
+			release.updateState(true)
 			return err
 		}
 		defer destination.Close()
@@ -635,7 +642,7 @@ func (release *release) install() {
 			if err != nil {
 				if err != io.EOF {
 					release.err = fmt.Errorf("error reading extracted file '%s': %w", info.NameInArchive, err)
-					release.updateState()
+					release.updateState(true)
 					return err
 				}
 
@@ -643,18 +650,18 @@ func (release *release) install() {
 			}
 			accumulated += n
 			release.progress = uint8(float64(accumulated) / float64(info.Size()) * 100)
-			release.updateState()
+			release.updateState(true)
 
 			if _, err = destination.Write(buffer[:n]); err != nil {
 				release.err = fmt.Errorf("error writing extracted file '%s': %w", info.NameInArchive, err)
-				release.updateState()
+				release.updateState(true)
 				return err
 			}
 
-			if info.NameInArchive == filepath.Join(release.pathName(), desktopFileName) {
+			if info.NameInArchive == filepath.Join(release.pathName, desktopFileName) {
 				if _, err = desktopEntry.Write(buffer[:n]); err != nil {
 					release.err = fmt.Errorf("error writing desktop entry to buffer: %w", err)
-					release.updateState()
+					release.updateState(true)
 					return err
 				}
 			}
@@ -663,7 +670,7 @@ func (release *release) install() {
 		return nil
 	}); err != nil {
 		release.err = fmt.Errorf("error extracting tarball: %w", err)
-		release.updateState()
+		release.updateState(true)
 		return
 	}
 
@@ -678,25 +685,25 @@ func (release *release) install() {
 
 	if desktopEntry.Len() == 0 {
 		release.err = fmt.Errorf("error finding desktop file")
-		release.updateState()
+		release.updateState(true)
 		return
 	}
 
 	home, err := os.UserHomeDir()
 	if err != nil {
 		release.err = fmt.Errorf("error getting home directory: %w", err)
-		release.updateState()
+		release.updateState(true)
 		return
 	}
 
-	oldExec := "Exec=" + filepath.Join("/", "usr", "share", desktopFileName[:strings.IndexByte(desktopFileName, '.')], release.pathName())
-	newExec := "Exec=" + filepath.Join(home, ".local", "bin", "dislaunch") + " " + release.String()
+	oldExec := "Exec=" + filepath.Join("/", "usr", "share", desktopFileName[:strings.IndexByte(desktopFileName, '.')], release.pathName)
+	newExec := "Exec=" + filepath.Join(home, ".local", "bin", "dislaunch") + " " + release.id
 	dislaunchDesktopEntry := strings.ReplaceAll(desktopEntry.String(), oldExec, newExec)
 
 	dislaunchDesktopFile, err := os.OpenFile(filepath.Join(getHomeXdgDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "applications", desktopFileName), os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		release.err = fmt.Errorf("error opening .desktop file: %w", err)
-		release.updateState()
+		release.updateState(true)
 		return
 	}
 	defer dislaunchDesktopFile.Close()
@@ -707,12 +714,12 @@ func (release *release) install() {
 		n, err := dislaunchDesktopFile.Write([]byte(dislaunchDesktopEntry)[accumulated:])
 		if err != nil {
 			release.err = fmt.Errorf("error writing to desktop file: %w", err)
-			release.updateState()
+			release.updateState(true)
 			return
 		}
 		accumulated += n
 		release.progress = uint8(float64(accumulated) / float64(len(dislaunchDesktopEntry)) * 100)
-		release.updateState()
+		release.updateState(true)
 	}
 
 }
@@ -724,13 +731,13 @@ func (release *release) move(path string) {
 	}
 	defer reset()
 
-	oldPath := filepath.Join(internal.InstallPath, release.pathName())
-	newPath := filepath.Join(path, release.pathName())
+	oldPath := filepath.Join(internal.InstallPath, release.pathName)
+	newPath := filepath.Join(path, release.pathName)
 
 	release.status = statusMove
 	release.message = "Moving to " + newPath
 	release.progress = 101
-	release.updateState()
+	release.updateState(true)
 
 	err := os.Rename(oldPath, newPath)
 	if err == nil {
@@ -741,7 +748,7 @@ func (release *release) move(path string) {
 
 	if err.(*os.LinkError).Err.(syscall.Errno) != syscall.EXDEV {
 		release.err = fmt.Errorf("error moving release '%s' to '%s': %w", release, path, err)
-		release.updateState()
+		release.updateState(true)
 		return
 	}
 
@@ -756,19 +763,19 @@ func (release *release) move(path string) {
 		// but if it works, it works.
 		Skip: func(_ os.FileInfo, _ string, dest string) (bool, error) {
 			release.message = "Copying to " + dest
-			release.updateState()
+			release.updateState(true)
 			// Don't skip, literally the only point of this is status reporting
 			return false, nil
 		},
 	}); err != nil {
 		release.err = fmt.Errorf("error copying release '%s' to '%s': %w", release, path, err)
-		release.updateState()
+		release.updateState(true)
 		return
 	}
 
 	if err = os.RemoveAll(oldPath); err != nil {
 		release.err = fmt.Errorf("error removing previous install path '%s': %w", oldPath, err)
-		release.updateState()
+		release.updateState(true)
 	}
 
 	internal.InstallPath = path
@@ -782,12 +789,12 @@ func (release *release) uninstall() {
 	}
 	defer reset()
 
-	path := filepath.Join(internal.InstallPath, release.pathName())
+	path := filepath.Join(internal.InstallPath, release.pathName)
 
 	release.status = statusUninstall
 	release.message = "Deleting " + path
 	release.progress = 101
-	release.updateState()
+	release.updateState(true)
 
 	// Scary!
 	// todo perhaps consider some safeguards to prevent deleting critical directories?
@@ -802,7 +809,7 @@ func (release *release) uninstall() {
 		release.message = "Failed to delete internal data at '" + release.getGobPath() + "'"
 		release.err = err
 	}
-	release.updateState()
+	release.updateState(true)
 }
 
 func (release *release) injectBd() {
