@@ -1,16 +1,7 @@
 int launch (ReleaseChannel channel) {
-	Socket.start ();
-	var state = channel.to_state (Socket.get_state ().backend_state);
-
-	// if (state == null) {
-	// stderr.printf ("Release '%s' is not installed. Please install it first.\n", channel.id);
-	// return Posix.EXIT_FAILURE;
-	// }
-
-	Socket.command (channel.id + " check_for_updates");
-	// if (state.version != state.internal.latest_version) {
-	new Progress (channel).run ();
-	// }
+	var status = new Progress (channel).run ();
+	if (status != Posix.EXIT_SUCCESS)
+		stderr.printf ("`Progress` failed with status code %d - launching %s as normal\n", status, channel.title);
 
 	string path_name;
 	if (channel == ReleaseChannel.STABLE)
@@ -20,15 +11,25 @@ int launch (ReleaseChannel channel) {
 	else
 		path_name = "DiscordCanary";
 
+	var state = channel.to_state (Socket.get_state ().backend_state);
+
+	if (state.internal == null) {
+		stderr.printf (channel.title + " is not installed, so cannot launch\n");
+		return Posix.EXIT_FAILURE;
+	}
+
 	var executable = "%s/%s/%s".printf (state.internal.install_path, path_name, path_name);
 
 	string[] command_line_arguments;
-	try {
-		Shell.parse_argv (state.internal.command_line_arguments, out command_line_arguments);
-	} catch (ShellError e) {
-		stderr.printf ("Failed to parse command-line arguments '%s': %s\n", state.internal.command_line_arguments, e.message);
+	if (state.internal.command_line_arguments != "")
+		try {
+			Shell.parse_argv (state.internal.command_line_arguments, out command_line_arguments);
+		} catch (ShellError e) {
+			stderr.printf ("Failed to parse command-line arguments '%s': %s\n", state.internal.command_line_arguments, e.message);
+			command_line_arguments = {};
+		}
+	else
 		command_line_arguments = {};
-	}
 
 	var argv = new string[command_line_arguments.length + 1];
 	argv[0] = executable;
