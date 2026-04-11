@@ -21,8 +21,8 @@ class SocketPage : Adw.Bin {
 		reset_button.set_size_request(100, 40);
 		reset_button.clicked.connect(() => Socket.start());
 
-		refresh(Socket.get_state());
 		Socket.on_state(refresh);
+		Socket.command("state");
 	}
 
 	private void refresh(SocketState state) {
