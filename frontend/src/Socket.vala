@@ -64,7 +64,17 @@ class Socket {
 	private static Queue<string> commands;
 
 	public static SocketState get_state () {
-		return instance.state;
+		SocketState? response = null;
+
+		ulong id = 0; // HACK `id` needs to have been declared in the handler
+		id = instance.state_sig.connect ((_, state) => {
+			response = state;
+			SignalHandler.disconnect (instance, id);
+		});
+
+		command ("state");
+		while (response == null);
+		return response;
 	}
 
 	public static void on_state (UpdateStateCallback callback) {
