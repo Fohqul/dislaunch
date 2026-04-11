@@ -123,7 +123,7 @@ class Socket {
 		}
 	}
 	private Thread<void> reader;
-	private bool should_read;
+	private Cancellable cancellable;
 	private SocketState state;
 	private string waiting {
 		get {
@@ -301,13 +301,13 @@ class Socket {
 		}
 	}
 
-	private void read () {
+	private void read (Cancellable cancellable) {
 		// `Json.Parser.load_from_stream` is unsuitable because it reads (and thereby blocks) until EOF, and we need to keep the connection open persistently
 		var stream = new DataInputStream (connection.input_stream);
 		waiting = null;
-		while (should_read) {
+		while (!cancellable.is_cancelled ()) {
 			try {
-				var message = stream.read_line_utf8 ();
+				var message = stream.read_line_utf8 (null, cancellable);
 				if (message == null) {
 					connection = null;
 					break;
@@ -315,16 +315,22 @@ class Socket {
 				stdout.printf ("Received message: %s\n", message);
 				handle_message (message);
 			} catch (IOError e) {
-				critical = e;
+				if (e.code != IOError.CANCELLED)
+					critical = e;
 			}
 		}
-		reader = null;
 	}
 
 	private void connect () {
+		cancellable.cancel ();
 		waiting = "Starting socket client";
 		error = null;
 		critical = null;
+		if (reader != null) {
+			waiting = "Waiting on pre-existing reader to exit";
+			reader.join ();
+			reader = null;
+		}
 		if (connection != null) {
 			try {
 				waiting = "Closing pre-existing connection";
@@ -333,12 +339,6 @@ class Socket {
 				critical = e;
 			}
 			connection = null;
-		}
-		if (reader != null) {
-			waiting = "Waiting on pre-existing reader to exit";
-			should_read = false;
-			reader.join ();
-			reader = null;
 		}
 
 		waiting = "Getting path from daemon";
@@ -372,8 +372,8 @@ class Socket {
 		}
 
 		waiting = "Spawning reader";
-		should_read = true;
-		reader = new Thread<void> ("read", read);
+		cancellable = new Cancellable ();
+		reader = new Thread<void> ("read", () => read (cancellable));
 		waiting = null;
 
 		command ("state");
