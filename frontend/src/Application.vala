@@ -28,6 +28,7 @@ class Application : Adw.Application {
 		margin: 0.6em;
 	}
 	""";
+	private ReleaseChannel[] channels = { ReleaseChannel.STABLE, ReleaseChannel.PTB, ReleaseChannel.CANARY };
 
 	private Adw.ApplicationWindow application_window;
 	private Adw.HeaderBar header_bar;
@@ -36,6 +37,7 @@ class Application : Adw.Application {
 	private Adw.ViewStack view_stack;
 	private Gtk.Revealer release_alert_revealer;
 	private Gtk.Label release_alert_label;
+	private Adw.ViewStackPage[] release_pages;
 	private SimpleAction configuration_action;
 
 	public Application () {
@@ -48,7 +50,7 @@ class Application : Adw.Application {
 		application_window = new Adw.ApplicationWindow (this) {
 			title = "Dislaunch",
 			default_height = 600,
-			default_width = 450,
+			default_width = 550,
 			resizable = false
 		};
 
@@ -126,22 +128,18 @@ class Application : Adw.Application {
 		release_reveal_button.clicked.connect (() => {
 			release_alert_revealer.reveal_child = !release_alert_revealer.reveal_child;
 		});
-		release_box.append (release_reveal_button);
+		// release_box.append (release_reveal_button);
 
 		var release_toolbar_view = new Adw.ToolbarView ();
 		release_box.append (release_toolbar_view);
 
-		var stable = new Release (application_window, ReleaseChannel.STABLE);
-		var ptb = new Release (application_window, ReleaseChannel.PTB);
-		var canary = new Release (application_window, ReleaseChannel.CANARY);
-
 		var release_view_stack = new Adw.ViewStack () { enable_transitions = true };
-		release_view_stack.add_titled_with_icon (stable, stable.channel.id, stable.channel.title, "discord");
-		release_view_stack.add_titled_with_icon (ptb, ptb.channel.id, ptb.channel.title, "discord-ptb");
-		release_view_stack.add_titled_with_icon (canary, canary.channel.id, canary.channel.title, "discord-canary");
+		release_pages = new Adw.ViewStackPage[3];
+		for (uint8 i = 0; i < channels.length; ++i)
+			release_pages[i] = release_view_stack.add_titled (new Release (application_window, channels[i]), channels[i].id, channels[i].title);
 		release_toolbar_view.content = release_view_stack;
 
-		release_toolbar_view.add_top_bar (new Adw.ViewSwitcher () { stack = release_view_stack, policy = Adw.ViewSwitcherPolicy.WIDE });
+		release_toolbar_view.add_top_bar (new Adw.InlineViewSwitcher () { can_shrink = false, homogeneous = true, stack = release_view_stack });
 
 		view_stack.add_named (new SocketPage (), "socket");
 
@@ -185,6 +183,13 @@ class Application : Adw.Application {
 			// release_alert_revealer.reveal_child = false;
 			// release_alert_label.label = null;
 		}
+
+		for (uint8 i = 0; i < channels.length; ++i) {
+			var release_state = channels[i].to_state (state.backend_state);
+			var installed = release_state != null && release_state.version != "" && release_state.internal != null;
+			release_pages[i].needs_attention = installed && release_state.internal.latest_version != "" && release_state.version != release_state.internal.latest_version;
+		}
+
 		view_stack.visible_child_name = "release";
 	}
 }
