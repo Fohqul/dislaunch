@@ -43,4 +43,8 @@ class ReleaseChannel {
 			return backend_state.canary;
 		assert_not_reached ();
 	}
+
+	public void command (string command) {
+		Socket.command (id + " " + command);
+	}
 }

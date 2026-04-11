@@ -153,7 +153,7 @@ class Progress : Adw.Application {
 			if (last_status == "update_check") {
 				if (release_state.version != release_state.internal.latest_version) {
 					attempts_remaining = 4; // so that `install` may reuse this field
-					Socket.command (channel.id + " install");
+					channel.command ("install");
 					append_message ("An update is available to " + release_state.internal.latest_version);
 				} else if (last_error_present != null) {
 					if (attempts_remaining <= 0) {
@@ -164,7 +164,7 @@ class Progress : Adw.Application {
 					}
 
 					--attempts_remaining;
-					Socket.command (channel.id + " check_for_updates");
+					channel.command ("check_for_updates");
 					checked = true;
 					append_message ("Last attempt to check for updates failed - %d remaining".printf (attempts_remaining));
 					last_error_present = null; // reset so that later iteration can know whether an error happened during its last attempt
@@ -188,11 +188,11 @@ class Progress : Adw.Application {
 				}
 
 				--attempts_remaining;
-				Socket.command (channel.id + " install");
+				channel.command ("install");
 				append_message ("Last attempt to install failed - %d remaining".printf (attempts_remaining));
 			} else {
 				if (!checked) {
-					Socket.command (channel.id + " check_for_updates");
+					channel.command ("check_for_updates");
 					checked = true;
 				}
 				status.label = "Starting";

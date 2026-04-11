@@ -44,7 +44,7 @@ class Release : Gtk.Box {
 		main_preferences_group.add (update_progress_row);
 
 		update_button = new Gtk.Button () { label = "Loading…", valign = Gtk.Align.CENTER };
-		update_button.clicked.connect ((button) => Socket.command (channel.id + (button.label == "Update" ? " install" : " check_for_updates"))); // somewhat hacky to determine state using direct properties but oh well
+		update_button.clicked.connect ((button) => channel.command (button.label == "Update" ? "install" : "check_for_updates")); // somewhat hacky to determine state using direct properties but oh well
 		update_row.add_suffix (update_button);
 
 		install_path_row = new FolderEntryRow (application_window, File.new_build_filename (Environment.get_user_state_dir (), "io.github.Fohqul.Dislaunch"), (path) => Socket.command ("%s move %s".printf (channel.id, path))) { title = "Install Path" };
@@ -65,7 +65,7 @@ class Release : Gtk.Box {
 			valign = Gtk.Align.CENTER
 		};
 		uninstall_button.add_css_class ("destructive-action");
-		uninstall_button.clicked.connect (() => Socket.command (channel.id + " uninstall"));
+		uninstall_button.clicked.connect (() => channel.command ("uninstall"));
 		uninstall_row.add_suffix (uninstall_button);
 
 		uninstall_progress_row = new ProgressRow (uninstall_row);
@@ -79,7 +79,7 @@ class Release : Gtk.Box {
 
 		bd_enabled_switch = new Gtk.Switch () { valign = Gtk.Align.CENTER };
 		bd_enabled_switch.state_set.connect ((_, state) => {
-			Socket.command (channel.id + " bd_enabled " + (state ? "1" : "0"));
+			channel.command ("bd_enabled " + (state ? "1" : "0"));
 			return true;
 		});
 		bd_enabled_row.add_suffix (bd_enabled_switch);
@@ -94,7 +94,7 @@ class Release : Gtk.Box {
 			assert_nonnull (row);
 			var string_object = bd_channels.get_item (row.selected) as Gtk.StringObject;
 			assert_nonnull (row);
-			Socket.command (channel.id + " bd_channel " + string_object.string.ascii_down (string_object.string.length));
+			channel.command ("bd_channel " + string_object.string.ascii_down (string_object.string.length));
 		});
 		bd_enabled_row.add_row (bd_channel_row);
 

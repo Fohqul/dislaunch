@@ -21,7 +21,7 @@ class InstallPage : Adw.Bin {
 			has_frame = true
 		};
 		install_button.set_size_request(100, 40);
-		install_button.clicked.connect(() => Socket.command(channel.id + " install"));
+		install_button.clicked.connect(() => channel.command("install"));
 
 		spinner_paintable = new Adw.SpinnerPaintable(status_page);
 
