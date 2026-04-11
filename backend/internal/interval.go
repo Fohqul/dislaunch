@@ -36,7 +36,7 @@ func runInterval(configuration Configuration, release *release) {
 
 func startIntervals() {
 	beeep.AppName = "Dislaunch"
-	for range time.Tick(10 * time.Minute) {
+	for range time.Tick(time.Hour) {
 		configuration := getConfiguration()
 		if !configuration.AutomaticallyCheckForUpdates {
 			continue
