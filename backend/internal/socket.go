@@ -286,8 +286,8 @@ func broadcastBackendState() {
 		select {
 		case <-entry.ctx.Done():
 			continue
-		default:
-			entry.write <- message
+		case entry.write <- message:
+			continue
 		}
 	}
 }
