@@ -59,9 +59,14 @@ func getConfiguration() Configuration {
 
 	var configuration Configuration
 	if err := json.UnmarshalRead(configurationFile, &configuration); err != nil && err != io.EOF {
-		if stat, err := configurationFile.Stat(); err != nil {
-			fmt.Fprintf(os.Stderr, "error getting stat of configuration file: %s\n", err)
-		} else if stat.Size() != 0 {
+		stat, statErr := configurationFile.Stat()
+		if statErr != nil {
+			fmt.Fprintf(os.Stderr, "error getting stat of configuration file: %s\n", statErr)
+		}
+
+		// print original decoding error even if stat failed;
+		// decoding error is expected if config file is empty
+		if statErr != nil || stat.Size() != 0 {
 			fmt.Fprintf(os.Stderr, "error decoding configuration: %s\n", err)
 		}
 	}
