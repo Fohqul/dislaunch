@@ -180,7 +180,15 @@ public override void activate () {
 				  "application-name",
 				  "Dislaunch",
 				  "developer-name",
-				  "Michael Fohqul"
+				  "Michael Fohqul",
+				  "website",
+				  "https://github.com/Fohqul/dislaunch",
+				  "issue-url",
+				  "https://github.com/Fohqul/dislaunch/issues",
+				  "copyright",
+				  "© 2026 Fohqul",
+				  "license-type",
+				  Gtk.License.GPL_3_0
 			  ) }
 		}, this
 	);
