@@ -96,12 +96,12 @@ class Progress : Adw.Application {
 
 		var signal_list_item_factory = new Gtk.SignalListItemFactory ();
 		signal_list_item_factory.bind.connect ((_, object) => {
-			Gtk.ListItem? list_item = object as Gtk.ListItem;
+			var list_item = object as Gtk.ListItem;
 			assert_nonnull (list_item);
-			Gtk.StringObject message = list_item.item as Gtk.StringObject;
+			var message = list_item.item as Gtk.StringObject;
 			assert_nonnull (message);
 
-			Gtk.Label label = new Gtk.Label (message.string) { halign = Gtk.Align.START, valign = Gtk.Align.END, wrap = true, wrap_mode = Pango.WrapMode.WORD_CHAR };
+			var label = new Gtk.Label (message.string) { halign = Gtk.Align.START, valign = Gtk.Align.END, wrap = true, wrap_mode = Pango.WrapMode.WORD_CHAR };
 			if (message.string.has_prefix ("Error: "))
 				label.add_css_class ("error");
 			list_item.child = label;
