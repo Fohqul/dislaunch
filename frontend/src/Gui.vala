@@ -1,7 +1,10 @@
 int launch (ReleaseChannel channel) {
 	var status = new Progress (channel).run ();
 	if (status != Posix.EXIT_SUCCESS)
-		stderr.printf ("`Progress` failed with status code %d - launching %s as normal\n", status, channel.title);
+		stderr.printf (
+			"`Progress` failed with status code %d - launching %s as normal\n", status,
+			channel.title
+		);
 
 	string path_name;
 	if (channel == ReleaseChannel.STABLE)
@@ -25,7 +28,10 @@ int launch (ReleaseChannel channel) {
 		try {
 			Shell.parse_argv (state.internal.command_line_arguments, out command_line_arguments);
 		} catch (ShellError e) {
-			stderr.printf ("Failed to parse command-line arguments '%s': %s\n", state.internal.command_line_arguments, e.message);
+			stderr.printf (
+				"Failed to parse command-line arguments '%s': %s\n",
+				state.internal.command_line_arguments, e.message
+			);
 			command_line_arguments = {};
 		}
 	else
