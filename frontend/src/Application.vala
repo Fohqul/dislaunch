@@ -181,6 +181,8 @@ public override void activate () {
 				  "Dislaunch",
 				  "developer-name",
 				  "Michael Fohqul",
+				  "comments",
+				  "<b>This is beta software</b> and may contain bugs and/or security vulnerabilities. The developer accepts no responsibility or liability for potential losses incurred by its use.",
 				  "website",
 				  "https://github.com/Fohqul/dislaunch",
 				  "issue-url",
