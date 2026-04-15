@@ -1,6 +1,7 @@
 class InstallPage : Adw.Bin {
 private ReleaseChannel channel;
 private Adw.StatusPage status_page;
+private Gtk.Box installing_box;
 private Gtk.Button install_button;
 private Adw.SpinnerPaintable spinner_paintable;
 private ProgressBar progress_bar;
@@ -25,7 +26,18 @@ public InstallPage (ReleaseChannel channel) {
 
 	spinner_paintable = new Adw.SpinnerPaintable (status_page);
 
+	installing_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 15);
+
 	progress_bar = new ProgressBar ();
+	installing_box.append (progress_bar);
+
+	var cancel_button = new Gtk.Button () {
+		label = "Cancel",
+		halign = Gtk.Align.CENTER,
+	};
+	cancel_button.set_size_request (100, 40);
+	cancel_button.clicked.connect (() => channel.command ("cancel"));
+	installing_box.append (cancel_button);
 
 	Socket.on_state ((state) => refresh (channel.to_state (state.backend_state)));
 }
@@ -42,7 +54,7 @@ private void refresh (ReleaseState? state) {
 	status_page.title = "Installing " + channel.title;
 	status_page.description = state.error != "" ? "%s\n\n%s".printf (state.message, state.error) : state.message;
 	status_page.paintable = spinner_paintable;
-	status_page.child = progress_bar;
+	status_page.child = installing_box;
 	progress_bar.progress = state.progress;
 }
 }

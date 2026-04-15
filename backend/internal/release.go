@@ -24,8 +24,13 @@ import (
 	"github.com/shirou/gopsutil/process"
 )
 
-func download(source string, destination io.Writer, progress func(progress uint8)) error {
-	response, err := http.Get(source)
+func download(ctx context.Context, source string, destination io.Writer, progress func(progress uint8)) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, source, nil)
+	if err != nil {
+		return fmt.Errorf("error creating request: %w", err)
+	}
+
+	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return fmt.Errorf("error downloading from '%s': %w", source, err)
 	}
@@ -35,6 +40,12 @@ func download(source string, destination io.Writer, progress func(progress uint8
 	accumulated := 0
 	finished := false
 	for !finished {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		n, err := response.Body.Read(buffer)
 		if err != nil {
 			if err != io.EOF {
@@ -88,6 +99,8 @@ type release struct {
 	pathName string
 
 	mu       sync.Mutex
+	ctx      context.Context
+	cancel   atomic.Value
 	status   status // currently active process
 	message  string
 	progress uint8 // indeterminate progress when 101
@@ -99,6 +112,7 @@ var stable, ptb, canary *release
 
 func newRelease(id string, pathName string) *release {
 	release := &release{id: id, pathName: pathName}
+	release.resetState(false)
 
 	release.mu.Lock()
 	defer release.mu.Unlock()
@@ -284,7 +298,7 @@ func (release *release) takeOver() (*releaseInternal, func()) {
 
 	if internal, err := release.getInternal(); err == nil {
 		return &internal, func() {
-			release.resetState()
+			release.resetState(true)
 			release.mu.Unlock()
 		}
 	}
@@ -327,7 +341,7 @@ func (release *release) updateState(broadcast bool) {
 	}
 }
 
-func (release *release) resetState() {
+func (release *release) resetState(broadcast bool) {
 	if release.status == statusFatal {
 		return
 	}
@@ -336,7 +350,12 @@ func (release *release) resetState() {
 	release.message = ""
 	release.progress = 0
 	release.err = nil
-	release.updateState(true)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	release.ctx = ctx
+	release.cancel.Store(cancel)
+
+	release.updateState(broadcast)
 }
 
 func (release *release) getState() *ReleaseState {
@@ -430,7 +449,7 @@ func (release *release) checkForUpdates() {
 	release.updateState(true)
 
 	var buffer bytes.Buffer
-	if err := download("https://discord.com/api/"+release.id+"/updates?platform=linux", &buffer, nil); err != nil {
+	if err := download(release.ctx, "https://discord.com/api/"+release.id+"/updates?platform=linux", &buffer, nil); err != nil {
 		release.err = fmt.Errorf("error downloading latest version info: %w", err)
 		release.updateState(true)
 		return
@@ -467,7 +486,7 @@ func (release *release) install() {
 		return
 	}
 
-	defer release.resetState()
+	defer release.resetState(true)
 
 	version, err := release.getVersion()
 	if installed && err != nil {
@@ -515,12 +534,16 @@ func (release *release) install() {
 		} else {
 			release.message = "Downloading latest version"
 		}
-		if err = download("https://discord.com/api/download/"+release.id+"?platform=linux&format=tar.gz", file, func(progress uint8) {
+		if err = download(release.ctx, "https://discord.com/api/download/"+release.id+"?platform=linux&format=tar.gz", file, func(progress uint8) {
 			release.progress = progress
 			release.updateState(true)
 		}); err != nil {
 			release.err = fmt.Errorf("error downloading %s %s: %w", release, internal.LatestVersion, err)
 			release.updateState(true)
+			if err := os.Remove(downloadPath); err != nil {
+				release.err = fmt.Errorf("error deleting partially downloaded tarball: %w", err)
+				release.updateState(true)
+			}
 			return // todo handle temporary/recoverable errors
 		}
 
@@ -606,7 +629,13 @@ func (release *release) install() {
 		Extraction:  archives.Tar{},
 		Compression: archives.Gz{},
 	}
-	if err = format.Extract(context.Background(), tarball, func(_ context.Context, info archives.FileInfo) error {
+	if err = format.Extract(release.ctx, tarball, func(ctx context.Context, info archives.FileInfo) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		release.message = "Extracting " + info.NameInArchive
 
 		if info.IsDir() {
@@ -671,6 +700,11 @@ func (release *release) install() {
 	}); err != nil {
 		release.err = fmt.Errorf("error extracting tarball: %w", err)
 		release.updateState(true)
+		// TODO if already installed, don't delete existing installation - extract first into a temporary dir and, upon finishing extraction without errors, move that into the normal install path
+		if err := os.RemoveAll(filepath.Join(installPath, release.pathName)); err != nil {
+			release.err = fmt.Errorf("error removing extracted tarball: %w", err)
+			release.updateState(true)
+		}
 		return
 	}
 
@@ -762,14 +796,22 @@ func (release *release) move(path string) {
 		// callback which obviously isn't meant for this,
 		// but if it works, it works.
 		Skip: func(_ os.FileInfo, _ string, dest string) (bool, error) {
+			select {
+			case <-release.ctx.Done():
+				return true, release.ctx.Err()
+			default:
+			}
 			release.message = "Copying to " + dest
 			release.updateState(true)
-			// Don't skip, literally the only point of this is status reporting
 			return false, nil
 		},
 	}); err != nil {
 		release.err = fmt.Errorf("error copying release '%s' to '%s': %w", release, path, err)
 		release.updateState(true)
+		if err := os.RemoveAll(newPath); err != nil {
+			release.err = fmt.Errorf("error cleaning up new path: %w", err)
+			release.updateState(true)
+		}
 		return
 	}
 

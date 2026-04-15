@@ -65,6 +65,8 @@ func releaseCommand(release *release, data string, command []string) {
 		default:
 			fmt.Fprintf(os.Stderr, "unknown BetterDiscord channel: %s\n", command[2])
 		}
+	case "cancel":
+		release.cancel.Load().(context.CancelFunc)()
 	case "check_for_updates":
 		go release.checkForUpdates()
 	case "command_line_arguments":
