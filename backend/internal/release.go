@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/gofrs/flock"
+	"github.com/google/go-github/github"
 	"github.com/mholt/archives"
 	cp "github.com/otiai10/copy"
 	"github.com/shirou/gopsutil/process"
@@ -156,6 +157,8 @@ type releaseInternal struct {
 	CommandLineArguments string    `json:"command_line_arguments"`
 	BdEnabled            bool      `json:"bd_enabled"`
 	BdChannel            bdChannel `json:"bd_channel"`
+	BdInstalledRelease   *int64    `json:"bd_installed_release"`
+	BdLatestRelease      *int64    `json:"bd_latest_release"`
 }
 
 func (release *release) String() string {
@@ -412,11 +415,7 @@ func (release *release) setBdEnabled(bdEnabled bool) {
 		return
 	}
 
-	if bdEnabled {
-		go release.injectBd()
-	} else {
-		go release.uninjectBd()
-	}
+	release.checkForBdUpdates(internal)
 }
 
 func (release *release) setBdChannel(bdChannel bdChannel) {
@@ -431,9 +430,7 @@ func (release *release) setBdChannel(bdChannel bdChannel) {
 		return
 	}
 
-	if internal.BdEnabled {
-		go release.injectBd()
-	}
+	release.checkForBdUpdates(internal)
 }
 
 func (release *release) checkForUpdates() {
@@ -468,6 +465,8 @@ func (release *release) checkForUpdates() {
 	internal.LatestVersion = latestVersion.Name
 	internal.LastChecked = time.Now()
 	release.setInternal(internal)
+
+	release.checkForBdUpdates(internal)
 }
 
 func (release *release) install() {
@@ -487,6 +486,12 @@ func (release *release) install() {
 	}
 
 	defer release.resetState(true)
+
+	// even if installing Discord fails for whatever reason,
+	// BetterDiscord should still be updated
+	defer func() {
+		go release.applyBd()
+	}()
 
 	version, err := release.getVersion()
 	if installed && err != nil {
@@ -854,22 +859,149 @@ func (release *release) uninstall() {
 	release.updateState(true)
 }
 
-func (release *release) injectBd() {
-	internal, reset := release.takeOver()
-	if internal == nil || reset == nil {
-		return
+func (release *release) checkForBdUpdates(internal *releaseInternal) error {
+	if !internal.BdEnabled {
+		return nil
 	}
-	defer reset()
 
-	// TODO
+	client := github.NewClient(nil)
+
+	switch internal.BdChannel {
+	case bdStable:
+		bdRelease, _, err := client.Repositories.GetLatestRelease(release.ctx, "BetterDiscord", "BetterDiscord")
+		if err != nil {
+			release.err = fmt.Errorf("error getting latest BetterDiscord release: %w", err)
+			release.updateState(true)
+			return err
+		}
+		internal.BdLatestRelease = bdRelease.ID
+	case bdCanary:
+		releases, _, err := client.Repositories.ListReleases(release.ctx, "BetterDiscord", "BetterDiscord", &github.ListOptions{Page: 1, PerPage: 1})
+		if err != nil {
+			release.err = fmt.Errorf("error getting BetterDiscord releases: %w", err)
+			release.updateState(true)
+			return err
+		}
+		internal.BdLatestRelease = releases[0].ID
+	default:
+		release.err = fmt.Errorf("invalid BetterDiscord release channel: %s", internal.BdChannel)
+		release.updateState(true)
+		return release.err
+	}
+
+	return release.setInternal(internal)
 }
 
-func (release *release) uninjectBd() {
+func (release *release) applyBd() {
 	internal, reset := release.takeOver()
 	if internal == nil || reset == nil {
 		return
 	}
 	defer reset()
 
-	// TODO
+	release.status = statusBdInjection
+	release.updateState(true)
+
+	version, err := release.getVersion()
+	if err != nil {
+		return
+	}
+
+	release.status = statusBdInjection
+
+	path := filepath.Join(getHomeXdgDirectory("XDG_CONFIG_HOME", ".config"), strings.ToLower(release.pathName), version, "modules", "discord_desktop_core")
+
+	if internal.BdEnabled {
+		if internal.BdLatestRelease == nil && release.checkForBdUpdates(internal) != nil {
+			return
+		}
+
+		if internal.BdInstalledRelease == nil || *internal.BdInstalledRelease != *internal.BdLatestRelease {
+			client := github.NewClient(nil)
+			bdRelease, _, err := client.Repositories.GetRelease(release.ctx, "BetterDiscord", "BetterDiscord", *internal.BdLatestRelease)
+			if err != nil {
+				release.err = fmt.Errorf("error getting latest BetterDiscord release: %w", err)
+				release.updateState(true)
+				return
+			}
+
+			for _, asset := range bdRelease.Assets {
+				if *asset.Name != "betterdiscord.asar" {
+					continue
+				}
+
+				if err = os.MkdirAll(path, 0755); err != nil {
+					release.err = fmt.Errorf("error creating '%s': %w", path, err)
+					release.updateState(true)
+					return
+				}
+
+				asarPath := filepath.Join(path, "betterdiscord.asar")
+
+				asar, err := os.OpenFile(asarPath, os.O_CREATE|os.O_WRONLY, 0600)
+				if err != nil {
+					release.err = fmt.Errorf("error opening '%s': %w", asarPath, err)
+					release.updateState(true)
+					return
+				}
+
+				release.message = "Downloading BetterDiscord"
+				release.updateState(true)
+
+				if err = download(release.ctx, *asset.BrowserDownloadURL, asar, func(progress uint8) {
+					release.progress = progress
+					release.updateState(true)
+				}); err != nil {
+					release.err = fmt.Errorf("error downloading BetterDiscord: %w", err)
+					release.updateState(true)
+					return
+				}
+
+				internal.BdInstalledRelease = internal.BdLatestRelease
+				release.setInternal(internal)
+
+				break
+			}
+		}
+	} else {
+		release.message = "Removing BetterDiscord"
+
+		if err = os.Remove(filepath.Join(path, "betterdiscord.asar")); err != nil && !errors.Is(err, os.ErrNotExist) {
+			release.err = fmt.Errorf("error deleting BetterDiscord: %w", err)
+			release.updateState(true)
+		}
+
+		internal.BdInstalledRelease = nil
+		internal.BdLatestRelease = nil
+		release.setInternal(internal)
+	}
+	release.updateState(true)
+
+	indexJsPath := filepath.Join(path, "index.js")
+	indexJs, err := os.OpenFile(indexJsPath, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		release.err = fmt.Errorf("error opening '%s': %w", indexJsPath, err)
+		release.updateState(true)
+		return
+	}
+
+	var content string
+	if internal.BdEnabled {
+		content = "require(\"./betterdiscord.asar\");\nmodule.exports = require(\"./core.asar\");"
+		release.message = "Injecting BetterDiscord"
+		release.updateState(true)
+	} else {
+		content = "module.exports = require('./core.asar');"
+	}
+
+	accumulated := 0
+	for accumulated < len(content) {
+		n, err := indexJs.WriteString(content)
+		if err != nil {
+			release.err = fmt.Errorf("error writing to '%s': %w", indexJsPath, err)
+			release.updateState(true)
+			return
+		}
+		accumulated += n
+	}
 }

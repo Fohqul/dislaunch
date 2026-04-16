@@ -10,6 +10,8 @@ public struct ReleaseInternal {
 	string command_line_arguments;
 	bool bd_enabled;
 	string bd_channel;
+	int64? bd_installed_release;
+	int64? bd_latest_release;
 }
 
 public struct ReleaseState {
@@ -274,6 +276,11 @@ private void parse_release (Json.Object parent_object, string channel, out Relea
 	if (bd_channel != "stable" && bd_channel != "canary")
 		throw new SocketError.INVALID_RESPONSE ("invalid BetterDiscord channel: %s", bd_channel);
 	state.internal.bd_channel = bd_channel;
+	state.internal.bd_installed_release = parse_value (
+		internal_object, "bd_installed_release",
+		Type.INT64
+	).get_int64 ();
+	state.internal.bd_latest_release = parse_value (internal_object, "bd_latest_release", Type.INT64).get_int64 ();
 	// } catch (Error e) {
 	// critical = e;
 	// }

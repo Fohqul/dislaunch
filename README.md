@@ -16,7 +16,7 @@ More specifically, why use Dislaunch over other existing automatic-update soluti
 - AUR and Pacstall packages rely on a maintainer manually keeping them up-to-date with the latest versions
 	- Since these packages aren't always up-to-date, you must intentionally inhibit updates to suppress the "Your lucky day is here!" dialogue while you wait for the maintainer to publish an update, meaning you aren't always up-to-date
 	- This may not be so bad for users of the stable release channel, but PTB and Canary users are hit hard by this
-- Neither of the above support automatically injecting BetterDiscord on each update (although this feature is still to-do in Dislaunch)
+- Neither of the above support automatically injecting BetterDiscord on each update
 
 ## Building from source
 

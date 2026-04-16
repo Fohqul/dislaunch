@@ -44,6 +44,8 @@ func setBoolean(set func(bool), setting string) {
 
 func releaseCommand(release *release, data string, command []string) {
 	switch command[1] {
+	case "bd_apply":
+		go release.applyBd()
 	case "bd_enabled":
 		if len(command) < 3 {
 			fmt.Fprintln(os.Stderr, "setting required for BetterDiscord enabled")

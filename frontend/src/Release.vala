@@ -19,6 +19,7 @@ private Gtk.StringList bd_channels;
 private Adw.ExpanderRow bd_enabled_row;
 private Gtk.Switch bd_enabled_switch;
 private Adw.ComboRow bd_channel_row;
+private Adw.ActionRow bd_apply_row;
 private ProgressRow bd_apply_progress_row;
 private Gtk.Button bd_apply_button;
 
@@ -127,7 +128,7 @@ public Release (Adw.ApplicationWindow application_window, ReleaseChannel channel
 	);
 	bd_enabled_row.add_row (bd_channel_row);
 
-	var bd_apply_row = new Adw.ActionRow ();
+	bd_apply_row = new Adw.ActionRow ();
 
 	bd_apply_button = new Gtk.Button () {
 		label = "Apply", valign = Gtk.Align.CENTER
@@ -137,12 +138,7 @@ public Release (Adw.ApplicationWindow application_window, ReleaseChannel channel
 		() => {
 			var string_object = bd_channels.get_item (bd_channel_row.selected) as Gtk.StringObject;
 			assert_nonnull (string_object);
-			Socket.command (
-				"%s bd_channel %s\n%s bd_enabled %b".printf (
-					channel.id, string_object.string,
-					channel.id, bd_enabled_switch.state
-				)
-			);
+			channel.command ("bd_apply");
 		}
 	);
 	bd_apply_row.add_suffix (bd_apply_button);
@@ -204,6 +200,8 @@ private void refresh (ReleaseState? state) {
 		assert_not_reached ();
 	}
 	bd_apply_progress_row.progress_bar.visible = false;
+	bd_apply_row.subtitle = state.internal.bd_latest_release != null &&
+		state.internal.bd_installed_release != state.internal.bd_latest_release ? "Update available" : "";
 	bd_apply_button.sensitive = true;
 
 	view_stack.visible_child_name = "preferences";
