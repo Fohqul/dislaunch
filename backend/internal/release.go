@@ -96,8 +96,9 @@ const (
 // such as `status`, `message`, `progress` and `err`.
 
 type release struct {
-	id       string
-	pathName string
+	id                   string
+	pathName             string
+	desktopEntryFileName string
 
 	mu       sync.Mutex
 	ctx      context.Context
@@ -111,8 +112,8 @@ type release struct {
 
 var stable, ptb, canary *release
 
-func newRelease(id string, pathName string) *release {
-	release := &release{id: id, pathName: pathName}
+func newRelease(id string, pathName string, desktopEntryFileName string) *release {
+	release := &release{id: id, pathName: pathName, desktopEntryFileName: desktopEntryFileName}
 	release.resetState(false)
 
 	release.mu.Lock()
@@ -124,21 +125,21 @@ func newRelease(id string, pathName string) *release {
 
 func getStable() *release {
 	if stable == nil {
-		stable = newRelease("stable", "Discord")
+		stable = newRelease("stable", "Discord", "discord.desktop")
 	}
 	return stable
 }
 
 func getPtb() *release {
 	if ptb == nil {
-		ptb = newRelease("ptb", "DiscordPTB")
+		ptb = newRelease("ptb", "DiscordPTB", "discord-ptb.desktop")
 	}
 	return ptb
 }
 
 func getCanary() *release {
 	if canary == nil {
-		canary = newRelease("canary", "DiscordCanary")
+		canary = newRelease("canary", "DiscordCanary", "discord-canary.desktop")
 	}
 	return canary
 }
@@ -618,17 +619,6 @@ func (release *release) install() {
 	}()
 
 	var desktopEntry bytes.Buffer
-	var desktopFileName string
-	switch release {
-	case stable:
-		desktopFileName = "discord.desktop"
-	case ptb:
-		desktopFileName = "discord-ptb.desktop"
-	case canary:
-		desktopFileName = "discord-canary.desktop"
-	default:
-		log.Fatalf("unknown release: %p", release)
-	}
 
 	format := archives.CompressedArchive{
 		Extraction:  archives.Tar{},
@@ -692,7 +682,7 @@ func (release *release) install() {
 				return err
 			}
 
-			if info.NameInArchive == filepath.Join(release.pathName, desktopFileName) {
+			if info.NameInArchive == filepath.Join(release.pathName, release.desktopEntryFileName) {
 				if _, err = desktopEntry.Write(buffer[:n]); err != nil {
 					release.err = fmt.Errorf("error writing desktop entry to buffer: %w", err)
 					release.updateState(true)
@@ -735,22 +725,22 @@ func (release *release) install() {
 		return
 	}
 
-	oldExec := "Exec=" + filepath.Join("/", "usr", "share", desktopFileName[:strings.IndexByte(desktopFileName, '.')], release.pathName)
+	oldExec := "Exec=" + filepath.Join("/", "usr", "share", release.desktopEntryFileName[:strings.IndexByte(release.desktopEntryFileName, '.')], release.pathName)
 	newExec := "Exec=" + filepath.Join(home, ".local", "bin", "dislaunch") + " " + release.id
 	dislaunchDesktopEntry := strings.ReplaceAll(desktopEntry.String(), oldExec, newExec)
 
-	dislaunchDesktopFile, err := os.OpenFile(filepath.Join(getHomeXdgDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "applications", desktopFileName), os.O_CREATE|os.O_WRONLY, 0644)
+	dislaunchDesktopEntryFile, err := os.OpenFile(filepath.Join(getHomeXdgDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "applications", release.desktopEntryFileName), os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		release.err = fmt.Errorf("error opening .desktop file: %w", err)
 		release.updateState(true)
 		return
 	}
-	defer dislaunchDesktopFile.Close()
+	defer dislaunchDesktopEntryFile.Close()
 
 	release.message = "Writing desktop entry"
 	accumulated := 0
 	for accumulated < len(dislaunchDesktopEntry) {
-		n, err := dislaunchDesktopFile.Write([]byte(dislaunchDesktopEntry)[accumulated:])
+		n, err := dislaunchDesktopEntryFile.Write([]byte(dislaunchDesktopEntry)[accumulated:])
 		if err != nil {
 			release.err = fmt.Errorf("error writing to desktop file: %w", err)
 			release.updateState(true)
@@ -850,11 +840,23 @@ func (release *release) uninstall() {
 		release.status = statusFatal
 		release.message = "Failed to uninstall"
 		release.err = err
-	} else if err = os.Remove(release.getGobPath()); err != nil {
+		release.updateState(true)
+	}
+
+	if err := os.Remove(filepath.Join(getHomeXdgDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "applications", release.desktopEntryFileName)); err != nil {
+		fmt.Fprintf(os.Stderr, "error deleting desktop entry for release '%s': %s\n", release, err)
+		release.status = statusFatal
+		release.message = "Failed to delete desktop entry"
+		release.err = err
+		release.updateState(true)
+	}
+
+	if err := os.Remove(release.getGobPath()); err != nil {
 		fmt.Fprintf(os.Stderr, "error deleting gob for release '%s': %s\n", release, err)
 		release.status = statusFatal
 		release.message = "Failed to delete internal data at '" + release.getGobPath() + "'"
 		release.err = err
+		release.updateState(true)
 	}
 	release.updateState(true)
 }
