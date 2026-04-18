@@ -374,7 +374,7 @@ func (release *release) getState() *ReleaseState {
 	value := release.state.Load()
 
 	if value == nil {
-		log.Fatalf("%s has a nil `state`\n", release.id)
+		log.Fatalf("%s has a nil `state`\n", release)
 		return nil
 	}
 
