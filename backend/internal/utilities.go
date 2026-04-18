@@ -51,10 +51,6 @@ func getHomeXdgDislaunchDirectory(environment string, fallback string) string {
 	return directory
 }
 
-func getDataHome() string {
-	return getHomeXdgDislaunchDirectory("XDG_DATA_HOME", filepath.Join(".local", "share"))
-}
-
 func getCacheDislaunchDirectory() (string, error) {
 	cache, err := os.UserCacheDir()
 	if err != nil {

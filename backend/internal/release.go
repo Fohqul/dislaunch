@@ -551,7 +551,7 @@ func (release *release) install() {
 	if installPath == "" {
 		installPath = getConfiguration().DefaultInstallPath
 		if installPath == "" {
-			installPath = getDataHome()
+			installPath = getHomeXdgDislaunchDirectory("XDG_DATA_HOME", filepath.Join(".local", "share"))
 		}
 	}
 	if installed {
