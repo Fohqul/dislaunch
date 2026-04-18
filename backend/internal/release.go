@@ -840,8 +840,6 @@ func (release *release) uninstall() {
 		release.err = err
 		release.updateState(internal, true)
 	}
-
-	release.updateState(internal, true)
 }
 
 func (release *release) checkForBdUpdates(internal *releaseInternal) error {
