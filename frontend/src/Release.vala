@@ -190,7 +190,7 @@ private void refresh (ReleaseState state) {
 	bd_enabled_switch.state = state.internal.bd_enabled;
 	bd_enabled_switch.active = state.internal.bd_enabled;
 	switch (state.internal.bd_channel) {
-	case "stable" :
+	case "stable":
 		bd_channel_row.selected = 0;
 		break;
 	case "canary":
