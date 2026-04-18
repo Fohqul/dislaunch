@@ -168,8 +168,8 @@ private void refresh (ReleaseState? state) {
 		update_button.label = "Check for updates";
 		update_button.remove_css_class ("suggested-action");
 	}
-	update_row.subtitle = state.internal.last_checked.to_unix () !=
-		0 ? state.internal.last_checked.format ("Last checked: %Y-%m-%d %H:%M:%S") : "";
+	update_row.subtitle = state.internal.last_checked !=
+		null ? state.internal.last_checked.format ("Last checked: %Y-%m-%d %H:%M:%S") : "";
 	update_progress_row.progress_bar.visible = false;
 	update_button.sensitive = true;
 

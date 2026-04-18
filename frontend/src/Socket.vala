@@ -264,7 +264,7 @@ private void parse_release (Json.Object parent_object, string channel, out Relea
 	state.internal.install_path = parse_value (internal_object, "install_path", Type.STRING).get_string ();
 	var last_checked = parse_value (internal_object, "last_checked", Type.STRING).get_string ();
 	state.internal.last_checked = new DateTime.from_iso8601 (last_checked, null);
-	if (state.internal.last_checked == null)
+	if (last_checked != "" && state.internal.last_checked == null)
 		throw new SocketError.INVALID_RESPONSE ("`last_checked` is not a valid DateTime: %s", last_checked);
 	state.internal.latest_version = parse_value (internal_object, "latest_version", Type.STRING).get_string ();
 	state.internal.command_line_arguments = parse_value (
