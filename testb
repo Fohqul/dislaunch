@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+
+working_directory=$PWD
+cd backend
+GOEXPERIMENT=jsonv2 go build ./cmd/dislaunchd && mv dislaunchd ~/.local/bin/dislaunchd
+cd "$working_directory"
