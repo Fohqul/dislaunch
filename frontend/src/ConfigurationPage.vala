@@ -19,12 +19,6 @@ public ConfigurationPage (Adw.ApplicationWindow application_window) {
 	automatically_check_for_updates_switch = new Gtk.Switch () {
 		valign = Gtk.Align.CENTER
 	};
-	automatically_check_for_updates_switch.state_set.connect (
-		(_, state) => {
-			Socket.command ("config automatically_check_for_updates " + (state ? "1" : "0"));
-			return true;
-		}
-	);
 	automatically_check_for_updates_row.add_suffix (automatically_check_for_updates_switch);
 
 	var notify_on_update_available_row = new Adw.ActionRow () {
@@ -35,12 +29,6 @@ public ConfigurationPage (Adw.ApplicationWindow application_window) {
 	notify_on_update_available_switch = new Gtk.Switch () {
 		valign = Gtk.Align.CENTER
 	};
-	notify_on_update_available_switch.state_set.connect (
-		(_, state) => {
-			Socket.command ("config notify_on_update_available " + (state ? "1" : "0"));
-			return true;
-		}
-	);
 	notify_on_update_available_row.add_suffix (notify_on_update_available_switch);
 
 	var automatically_install_updates_row = new Adw.ActionRow () {
@@ -51,12 +39,6 @@ public ConfigurationPage (Adw.ApplicationWindow application_window) {
 	automatically_install_updates_switch = new Gtk.Switch () {
 		valign = Gtk.Align.CENTER
 	};
-	automatically_install_updates_switch.state_set.connect (
-		(_, state) => {
-			Socket.command ("config automatically_install_updates " + (state ? "1" : "0"));
-			return true;
-		}
-	);
 	automatically_install_updates_row.add_suffix (automatically_install_updates_switch);
 
 	default_install_path_row = new FolderEntryRow (
@@ -70,18 +52,42 @@ public ConfigurationPage (Adw.ApplicationWindow application_window) {
 	};
 	preferences_group.add (default_install_path_row);
 
-	Socket.on_state (
-		(state) => {
-			var config = state.backend_state.config;
-			automatically_check_for_updates_switch.state = config.automatically_check_for_updates;
-			automatically_check_for_updates_switch.active = config.automatically_check_for_updates;
-			notify_on_update_available_switch.state = config.notify_on_update_available;
-			notify_on_update_available_switch.active = config.notify_on_update_available;
-			automatically_install_updates_switch.state = config.automatically_install_updates;
-			automatically_install_updates_switch.active = config.automatically_install_updates;
-			default_install_path_row.text = config.default_install_path ==
-				null ? "" : config.default_install_path;
-		}
-	);
+	Socket.on_state ((state) => refresh (state.backend_state.config));
 }
+
+private bool automatically_check_for_updates_switch_state_set (Gtk.Switch _, bool state) {
+	Socket.command ("config automatically_check_for_updates " + (state ? "1" : "0"));
+	return true;
+}
+
+private bool notify_on_update_available_switch_state_set (Gtk.Switch _, bool state) {
+	Socket.command ("config notify_on_update_available " + (state ? "1" : "0"));
+	return true;
+}
+
+private bool automatically_install_updates_switch_state_set (Gtk.Switch _, bool state) {
+	Socket.command ("config automatically_install_updates " + (state ? "1" : "0"));
+	return true;
+}
+
+private void refresh (Configuration config) {
+	automatically_check_for_updates_switch.state_set.disconnect (automatically_check_for_updates_switch_state_set);
+	automatically_check_for_updates_switch.state = config.automatically_check_for_updates;
+	automatically_check_for_updates_switch.active = config.automatically_check_for_updates;
+	automatically_check_for_updates_switch.state_set.connect (automatically_check_for_updates_switch_state_set);
+
+	notify_on_update_available_switch.state_set.disconnect (notify_on_update_available_switch_state_set);
+	notify_on_update_available_switch.state = config.automatically_check_for_updates;
+	notify_on_update_available_switch.active = config.automatically_check_for_updates;
+	notify_on_update_available_switch.state_set.connect (notify_on_update_available_switch_state_set);
+
+	automatically_install_updates_switch.state_set.disconnect (automatically_install_updates_switch_state_set);
+	automatically_install_updates_switch.state = config.automatically_check_for_updates;
+	automatically_install_updates_switch.active = config.automatically_check_for_updates;
+	automatically_install_updates_switch.state_set.connect (automatically_install_updates_switch_state_set);
+
+	default_install_path_row.text = config.default_install_path ==
+		null ? "" : config.default_install_path;
+}
+
 }
