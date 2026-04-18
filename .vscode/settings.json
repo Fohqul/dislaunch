@@ -1,0 +1,14 @@
+{
+  "uncrustify.configPath.linux": "frontend/uncrustify.cfg",
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/builddir/compile_commands.json",
+  "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild",
+  "[vala]": {
+    "editor.defaultFormatter": "zachflower.uncrustify"
+  },
+  "gopls": {
+    "build.env": {
+      "GOEXPERIMENT": "jsonv2"
+    }
+  },
+  "cmake.ignoreCMakeListsMissing": true
+}
