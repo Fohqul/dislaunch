@@ -300,7 +300,7 @@ func (release *release) takeOver() (*releaseInternal, func()) {
 }
 
 type ReleaseState struct {
-	Status   string `json:"status"`
+	Status   status `json:"status"`
 	Message  string `json:"message"`
 	Progress uint8  `json:"progress"`
 	Error    string `json:"error"`
@@ -311,7 +311,7 @@ type ReleaseState struct {
 
 func (release *release) updateState(broadcast bool) {
 	state := &ReleaseState{
-		Status:   string(release.status),
+		Status:   release.status,
 		Message:  release.message,
 		Progress: release.progress,
 	}

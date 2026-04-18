@@ -17,7 +17,7 @@ func runInterval(configuration Configuration, release *release) {
 
 	release.checkForUpdates()
 	state = release.getState()
-	if state.Status == "fatal" || state.Internal == nil || state.Version == state.Internal.LatestVersion {
+	if state.Status == statusFatal || state.Internal == nil || state.Version == state.Internal.LatestVersion {
 		return
 	}
 
