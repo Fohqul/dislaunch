@@ -150,7 +150,6 @@ func newRelease(id string, pathName string, desktopEntryFileName string) *releas
 	}
 
 	release.reset(nil, false)
-	release.flush(nil, false)
 
 	return release
 }
