@@ -77,7 +77,6 @@ type status string
 
 const (
 	statusNone        status = ""
-	statusDownload    status = "download"
 	statusInstall     status = "install"
 	statusUpdateCheck status = "update_check"
 	statusBdInjection status = "bd_injection"
