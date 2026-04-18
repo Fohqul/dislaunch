@@ -204,8 +204,7 @@ func (release *release) openGob(flag int) (*os.File, func()) {
 	file, err := os.OpenFile(release.gobPath, os.O_CREATE|flag, 0600)
 	if err != nil {
 		release.status = statusFatal
-		release.message = "Failed to open internal release data"
-		release.err = err
+		release.err = fmt.Errorf("error opening internal data for release '%s': %w", release, err)
 		release.flush(nil, true)
 		return nil, nil
 	}
@@ -225,9 +224,8 @@ func (release *release) getInternal() (releaseInternal, error) {
 	var internal releaseInternal
 	if err := gob.NewDecoder(file).Decode(&internal); err != nil {
 		release.status = statusFatal
-		release.message = "Failed to decode internal data"
-		release.err = err
-		return releaseInternal{}, err
+		release.err = fmt.Errorf("error decoding internal data for release '%s': %w", release, err)
+		return releaseInternal{}, release.err
 	}
 	return internal, nil
 }
@@ -247,10 +245,9 @@ func (release *release) setInternal(internal *releaseInternal) error {
 
 	if err := gob.NewEncoder(file).Encode(internal); err != nil {
 		release.status = statusFatal
-		release.message = "Failed to encode internal data"
-		release.err = err
+		release.err = fmt.Errorf("error encoding internal data for release '%s': %w", release, err)
 		release.flush(nil, true)
-		return err
+		return release.err
 	}
 	return nil
 }
@@ -281,7 +278,6 @@ func (release *release) getVersion(internal *releaseInternal) (string, error) {
 	}
 	if buildInfo.ReleaseChannel != release.id {
 		release.status = statusFatal
-		release.message = "Release is installed, but it reports an unexpected release channel"
 		release.err = fmt.Errorf("mismatched release channel: %s", buildInfo.ReleaseChannel)
 		return "", release.err
 	}
@@ -806,18 +802,14 @@ func (release *release) uninstall() {
 	// Scary!
 	// todo perhaps consider some safeguards to prevent deleting critical directories?
 	if err := os.RemoveAll(path); err != nil {
-		fmt.Fprintf(os.Stderr, "error uninstalling release '%s' from '%s': %s\n", release, internal.InstallPath, err)
 		release.status = statusFatal
-		release.message = "Failed to uninstall"
-		release.err = err
+		release.err = fmt.Errorf("error uninstalling release '%s' from '%s': %w", release, internal.InstallPath, err)
 		release.flush(internal, true)
 	}
 
 	if err := os.Remove(filepath.Join(getHomeXdgDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "applications", release.desktopEntryFileName)); err != nil {
-		fmt.Fprintf(os.Stderr, "error deleting desktop entry for release '%s': %s\n", release, err)
 		release.status = statusFatal
-		release.message = "Failed to delete desktop entry"
-		release.err = err
+		release.err = fmt.Errorf("error deleting desktop entry for release '%s': %w", release, err)
 		release.flush(internal, true)
 	}
 }
