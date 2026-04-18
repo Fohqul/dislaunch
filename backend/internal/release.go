@@ -939,6 +939,11 @@ func (release *release) applyBd() {
 			}
 		}
 	} else {
+		if internal.BdInstalledRelease == nil {
+			// no need to remove it, it shouldn't be installed or injected anyway
+			return
+		}
+
 		release.message = "Removing BetterDiscord"
 
 		if err = os.Remove(filepath.Join(path, "betterdiscord.asar")); err != nil && !errors.Is(err, os.ErrNotExist) {
