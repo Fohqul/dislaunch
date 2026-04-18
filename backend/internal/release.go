@@ -114,6 +114,7 @@ type releaseInternal struct {
 type release struct {
 	id                   string
 	pathName             string
+	gobPath              string
 	desktopEntryFileName string
 
 	mu       sync.Mutex
@@ -139,7 +140,12 @@ type releaseState struct {
 var stable, ptb, canary *release
 
 func newRelease(id string, pathName string, desktopEntryFileName string) *release {
-	release := &release{id: id, pathName: pathName, desktopEntryFileName: desktopEntryFileName}
+	release := &release{
+		id:                   id,
+		pathName:             pathName,
+		gobPath:              filepath.Join(getHomeXdgDislaunchDirectory("XDG_STATE_HOME", filepath.Join(".local", "state")), id+".gob"),
+		desktopEntryFileName: desktopEntryFileName,
+	}
 
 	release.mu.Lock()
 	defer release.mu.Unlock()
@@ -179,10 +185,6 @@ func (release *release) String() string {
 	return release.id
 }
 
-func (release *release) getGobPath() string {
-	return filepath.Join(getHomeXdgDislaunchDirectory("XDG_STATE_HOME", filepath.Join(".local", "state")), release.id+".gob")
-}
-
 // Any errors in dealing with internal release data
 // (e.g. opening the gob, encoding/decoding) are always
 // considered fatal. So that their callers don't all need
@@ -196,11 +198,10 @@ func (release *release) getGobPath() string {
 
 // `nil, nil` return value means an error occurred
 func (release *release) openGob(flag int) (*os.File, func()) {
-	path := release.getGobPath()
-	lock := flock.New(path)
+	lock := flock.New(release.gobPath)
 	// Whilst we would ideally allow `getInternal` to take a shared lock, it may be replaced with an exclusive lock by a call to `setInternal`. See https://pkg.go.dev/github.com/gofrs/flock#Flock.Lock
 	lock.Lock()
-	file, err := os.OpenFile(path, os.O_CREATE|flag, 0600)
+	file, err := os.OpenFile(release.gobPath, os.O_CREATE|flag, 0600)
 	if err != nil {
 		release.status = statusFatal
 		release.message = "Failed to open internal release data"
