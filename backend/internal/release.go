@@ -381,7 +381,7 @@ func (release *release) getState() *ReleaseState {
 	state, ok := value.(*ReleaseState)
 
 	if !ok {
-		fmt.Fprintln(os.Stderr, "error loading release state: ", release) // todo should this be fatal?
+		log.Fatalln("error loading release state: ", release)
 		return nil
 	}
 
