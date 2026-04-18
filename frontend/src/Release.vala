@@ -104,12 +104,6 @@ public Release (Adw.ApplicationWindow application_window, ReleaseChannel channel
 	bd_enabled_switch = new Gtk.Switch () {
 		valign = Gtk.Align.CENTER
 	};
-	bd_enabled_switch.state_set.connect (
-		(_, state) => {
-			channel.command ("bd_enabled " + (state ? "1" : "0"));
-			return true;
-		}
-	);
 	bd_enabled_row.add_suffix (bd_enabled_switch);
 
 	bd_channels = new Gtk.StringList ({ "Stable", "Canary" });
@@ -117,15 +111,6 @@ public Release (Adw.ApplicationWindow application_window, ReleaseChannel channel
 		title = "BetterDiscord Channel",
 		model = bd_channels
 	};
-	bd_channel_row.notify["selected"].connect (
-		(object, _) => {
-			var row = object as Adw.ComboRow;
-			assert_nonnull (row);
-			var string_object = bd_channels.get_item (row.selected) as Gtk.StringObject;
-			assert_nonnull (row);
-			channel.command ("bd_channel " + string_object.string.ascii_down (string_object.string.length));
-		}
-	);
 	bd_enabled_row.add_row (bd_channel_row);
 
 	bd_apply_row = new Adw.ActionRow ();
@@ -148,6 +133,55 @@ public Release (Adw.ApplicationWindow application_window, ReleaseChannel channel
 
 	view_stack.visible_child_name = "preferences";
 	Socket.on_state ((state) => refresh (channel.to_state (state.backend_state)));
+}
+
+private bool bd_enabled_switch_state_set (Gtk.Switch bd_enabled_switch, bool state) {
+	if (!state) {
+		channel.command ("bd_enabled 0");
+		return true;
+	}
+
+	var path = Path.build_filename (Environment.get_user_state_dir (), "io.github.Fohqul.Dislaunch", "warned-bd");
+
+	if (FileUtils.test (path, FileTest.EXISTS)) {
+		channel.command ("bd_enabled 1");
+		return true;
+	}
+
+	var alert_dialog = new Adw.AlertDialog (
+		"Warning",
+		"BetterDiscord extends Discord with plugins, themes and custom CSS. It technically violates Discord's Terms of Service — whilst it has not been known to actually happen, this could result in your Discord account being banned.\n\nBy continuing, you accept this risk and that Dislaunch's developer accepts no responsibility for any consequences arising from your use of BetterDiscord."
+		) {
+		close_response = "cancel"
+	};
+	alert_dialog.add_responses ("cancel", "Cancel", "continue", "Continue");
+	alert_dialog.set_response_appearance ("continue", Adw.ResponseAppearance.DESTRUCTIVE);
+	alert_dialog.response.connect (
+		(response) => {
+			switch (response) {
+				case "cancel":
+					bd_enabled_switch.state = false;
+					channel.command ("bd_enabled 0");
+					break;
+				case "continue":
+					Posix.close (Posix.open (path, Posix.O_CREAT | Posix.O_WRONLY, 0600));
+					channel.command ("bd_enabled 1");
+					break;
+				default:
+					assert_not_reached ();
+			}
+		}
+	);
+	alert_dialog.present (this);
+	return true;
+}
+
+private void bd_channel_row_selected (Object object, ParamSpec _) {
+	var row = object as Adw.ComboRow;
+	assert_nonnull (row);
+	var string_object = bd_channels.get_item (row.selected) as Gtk.StringObject;
+	assert_nonnull (row);
+	channel.command ("bd_channel " + string_object.string.ascii_down (string_object.string.length));
 }
 
 private void refresh (ReleaseState state) {
@@ -187,8 +221,11 @@ private void refresh (ReleaseState state) {
 	uninstall_button.label = "Uninstall";
 
 	bd_enabled_row.expanded = state.internal.bd_enabled;
+	bd_enabled_switch.state_set.disconnect (bd_enabled_switch_state_set);
 	bd_enabled_switch.state = state.internal.bd_enabled;
 	bd_enabled_switch.active = state.internal.bd_enabled;
+	bd_enabled_switch.state_set.connect (bd_enabled_switch_state_set);
+	bd_channel_row.notify["selected"].disconnect (bd_channel_row_selected);
 	switch (state.internal.bd_channel) {
 	case "stable":
 		bd_channel_row.selected = 0;
@@ -199,6 +236,7 @@ private void refresh (ReleaseState state) {
 	default: // formatter gonna format :thumbsup:
 		assert_not_reached ();
 	}
+	bd_channel_row.notify["selected"].connect (bd_channel_row_selected);
 	bd_apply_progress_row.progress_bar.visible = false;
 	bd_apply_row.subtitle = state.internal.bd_latest_release != null &&
 		state.internal.bd_installed_release != state.internal.bd_latest_release ? "Update available" : "";
