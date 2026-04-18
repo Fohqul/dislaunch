@@ -88,9 +88,27 @@ const (
 	statusFatal status = "fatal"
 )
 
-// A "process" is essentially a method of `Release` which is
-// publicly accessible, such as `CheckForUpdates`, `Move` and
-// `Install`, along with the state associated with that,
+type bdChannel string
+
+const (
+	bdStable bdChannel = "stable"
+	bdCanary bdChannel = "canary"
+)
+
+type releaseInternal struct {
+	InstallPath          string    `json:"install_path"`
+	LastChecked          time.Time `json:"last_checked"`
+	LatestVersion        string    `json:"latest_version"`
+	CommandLineArguments string    `json:"command_line_arguments"`
+	BdEnabled            bool      `json:"bd_enabled"`
+	BdChannel            bdChannel `json:"bd_channel"`
+	BdInstalledRelease   *int64    `json:"bd_installed_release"`
+	BdLatestRelease      *int64    `json:"bd_latest_release"`
+}
+
+// A "process" is essentially a method of `release` which is
+// publicly accessible, such as `checkForUpdates`, `move` and
+// `install`, along with the state associated with that,
 // such as `status`, `message`, `progress` and `err`.
 
 type release struct {
@@ -106,6 +124,16 @@ type release struct {
 	progress uint8 // indeterminate progress when 101
 	err      error
 	state    atomic.Value
+}
+
+type releaseState struct {
+	Status   status `json:"status"`
+	Message  string `json:"message"`
+	Progress uint8  `json:"progress"`
+	Error    string `json:"error"`
+
+	Internal *releaseInternal `json:"internal"`
+	Version  string           `json:"version"`
 }
 
 var stable, ptb, canary *release
@@ -148,24 +176,6 @@ func getCanary() *release {
 	return canary
 }
 
-type bdChannel string
-
-const (
-	bdStable bdChannel = "stable"
-	bdCanary bdChannel = "canary"
-)
-
-type releaseInternal struct {
-	InstallPath          string    `json:"install_path"`
-	LastChecked          time.Time `json:"last_checked"`
-	LatestVersion        string    `json:"latest_version"`
-	CommandLineArguments string    `json:"command_line_arguments"`
-	BdEnabled            bool      `json:"bd_enabled"`
-	BdChannel            bdChannel `json:"bd_channel"`
-	BdInstalledRelease   *int64    `json:"bd_installed_release"`
-	BdLatestRelease      *int64    `json:"bd_latest_release"`
-}
-
 func (release *release) String() string {
 	return release.id
 }
@@ -178,11 +188,12 @@ func (release *release) getGobPath() string {
 // (e.g. opening the gob, encoding/decoding) are always
 // considered fatal. So that their callers don't all need
 // to handle updating the release's state (`release.status
-// = Fatal`, `release.err = err` etc.), the helpers `openGob`,
-// `setInternal`, `getInternal` and `getVersion` all do this
-// automatically. Therefore, their callers must not only hold
-// the lock, but also return immediately if these helpers
-// return an error, as that means the status is fatal.
+// = statusFatal`, `release.err = err` etc.), the helpers
+// `openGob`, `setInternal`, `getInternal` and `getVersion`
+// all do this automatically. Therefore, their callers must
+// not only hold the lock, but also return immediately if
+// these helpers return an error, as that means the status
+// is fatal.
 
 // `nil, nil` return value means an error occurred
 func (release *release) openGob(flag int) (*os.File, func()) {
@@ -299,18 +310,8 @@ func (release *release) takeOver() (*releaseInternal, func()) {
 	return nil, nil
 }
 
-type ReleaseState struct {
-	Status   status `json:"status"`
-	Message  string `json:"message"`
-	Progress uint8  `json:"progress"`
-	Error    string `json:"error"`
-
-	Internal *releaseInternal `json:"internal"`
-	Version  string           `json:"version"`
-}
-
 func (release *release) updateState(broadcast bool) {
-	state := &ReleaseState{
+	state := &releaseState{
 		Status:   release.status,
 		Message:  release.message,
 		Progress: release.progress,
@@ -351,15 +352,15 @@ func (release *release) resetState(broadcast bool) {
 	release.updateState(broadcast)
 }
 
-func (release *release) getState() *ReleaseState {
-	// `GetState` returns the atomic value `release.state`
+func (release *release) getState() *releaseState {
+	// `getState` returns the atomic value `release.state`
 	// because if it composed/constructed the state using
 	// `getInternal` and `getVersion`, it would require the
 	// lock. But in many cases, that lock is held by an
 	// active process, which prevents progress reports from
 	// being broadcast. So, processes use the `updateState`
 	// helper (whose callers already own the lock) to mutate
-	// `release.state`, which `GetState` then reads from.
+	// `release.state`, which `getState` then reads from.
 
 	value := release.state.Load()
 
@@ -368,7 +369,7 @@ func (release *release) getState() *ReleaseState {
 		return nil
 	}
 
-	state, ok := value.(*ReleaseState)
+	state, ok := value.(*releaseState)
 
 	if !ok {
 		log.Fatalln("error loading release state: ", release)

@@ -259,10 +259,10 @@ func StartListener() (func(), error) {
 	}, nil
 }
 
-type BackendState struct {
-	Stable        *ReleaseState `json:"stable"`
-	Ptb           *ReleaseState `json:"ptb"`
-	Canary        *ReleaseState `json:"canary"`
+type backendState struct {
+	Stable        *releaseState `json:"stable"`
+	Ptb           *releaseState `json:"ptb"`
+	Canary        *releaseState `json:"canary"`
 	Configuration Configuration `json:"config"`
 }
 
@@ -271,7 +271,7 @@ func broadcastBackendState() {
 		return
 	}
 
-	buffer, err := json.Marshal(BackendState{
+	buffer, err := json.Marshal(backendState{
 		Stable:        getStable().getState(),
 		Ptb:           getPtb().getState(),
 		Canary:        getCanary().getState(),
