@@ -480,7 +480,11 @@ func (release *release) install() {
 	release.status = statusInstall
 	release.flush(internal, true)
 
-	cache := getHomeXdgDislaunchDirectory("XDG_CACHE_HOME", ".cache")
+	cache, err := getCacheDislaunchDirectory()
+	if err != nil {
+		release.err = fmt.Errorf("error getting cache Dislaunch directory: %w", err)
+		return
+	}
 
 	tarballPath := filepath.Join(cache, release.id)
 	if installed {
@@ -865,7 +869,14 @@ func (release *release) applyBd() {
 
 	release.status = statusBdInjection
 
-	path := filepath.Join(getHomeXdgDirectory("XDG_CONFIG_HOME", ".config"), strings.ToLower(release.pathName), version, "modules", "discord_desktop_core")
+	// no need to `os.MkdirAll` here, I already do it later
+	config, err := os.UserConfigDir()
+	if err != nil {
+		release.err = fmt.Errorf("error getting user config directory: %w", err)
+		return
+	}
+
+	path := filepath.Join(config, strings.ToLower(release.pathName), version, "modules", "discord_desktop_core")
 
 	if internal.BdEnabled {
 		if internal.BdLatestRelease == nil && release.checkForBdUpdates(internal) != nil {

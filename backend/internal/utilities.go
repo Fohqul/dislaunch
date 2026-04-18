@@ -2,6 +2,7 @@ package dislaunch
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"log"
 	"os"
@@ -52,4 +53,19 @@ func getHomeXdgDislaunchDirectory(environment string, fallback string) string {
 
 func getDataHome() string {
 	return getHomeXdgDislaunchDirectory("XDG_DATA_HOME", filepath.Join(".local", "share"))
+}
+
+func getCacheDislaunchDirectory() (string, error) {
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		return "", fmt.Errorf("error getting user cache directory: %w", err)
+	}
+
+	path := filepath.Join(cache, "io.github.Fohqul.Dislaunch")
+
+	if err := os.MkdirAll(path, 0700); err != nil && !errors.Is(err, os.ErrExist) {
+		return "", fmt.Errorf("error creating cache Dislaunch directory at '%s': %w", path, err)
+	}
+
+	return path, nil
 }
