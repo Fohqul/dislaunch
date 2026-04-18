@@ -85,7 +85,6 @@ const (
 	// A fatal status indicates that, when a release is installed, something has gone seriously wrong and
 	// the application has reached a state it never should have. Processes should return immediately when
 	// the state becomes fatal so as to prevent further damage being done or further errors occurring.
-	// However, a fatal status is expected when the release is not installed.
 	statusFatal status = "fatal"
 )
 
@@ -113,10 +112,16 @@ var stable, ptb, canary *release
 
 func newRelease(id string, pathName string, desktopEntryFileName string) *release {
 	release := &release{id: id, pathName: pathName, desktopEntryFileName: desktopEntryFileName}
-	release.resetState(false)
 
 	release.mu.Lock()
 	defer release.mu.Unlock()
+
+	_, err := release.getInternal()
+	if err == io.EOF {
+		release.setInternal(&releaseInternal{BdChannel: bdStable})
+	}
+
+	release.resetState(false)
 	release.updateState(false)
 
 	return release
@@ -169,19 +174,6 @@ func (release *release) getGobPath() string {
 	return filepath.Join(getHomeXdgDislaunchDirectory("XDG_STATE_HOME", filepath.Join(".local", "state")), release.id+".gob")
 }
 
-func (release *release) isInstalled() bool {
-	_, err := os.Stat(release.getGobPath())
-	if err == nil {
-		return true
-	}
-	if errors.Is(err, os.ErrNotExist) {
-		return false
-	}
-
-	log.Fatalf("failed to stat gob for release '%s'\n", release)
-	return false
-}
-
 // Any errors in dealing with internal release data
 // (e.g. opening the gob, encoding/decoding) are always
 // considered fatal. So that their callers don't all need
@@ -190,9 +182,7 @@ func (release *release) isInstalled() bool {
 // `setInternal`, `getInternal` and `getVersion` all do this
 // automatically. Therefore, their callers must not only hold
 // the lock, but also return immediately if these helpers
-// return an error, as that means the status is fatal (unless
-// it is expected to be, such as when the release isn't
-// installed.)
+// return an error, as that means the status is fatal.
 
 // `nil, nil` return value means an error occurred
 func (release *release) openGob(flag int) (*os.File, func()) {
@@ -215,10 +205,6 @@ func (release *release) openGob(flag int) (*os.File, func()) {
 }
 
 func (release *release) getInternal() (releaseInternal, error) {
-	if !release.isInstalled() {
-		return releaseInternal{}, fmt.Errorf("release '%s' is not installed", release)
-	}
-
 	file, close := release.openGob(os.O_RDONLY)
 	if file == nil || close == nil {
 		return releaseInternal{}, fmt.Errorf("error opening gob")
@@ -268,6 +254,10 @@ func (release *release) getVersion() (string, error) {
 	internal, err := release.getInternal()
 	if err != nil {
 		return "", err
+	}
+
+	if internal.InstallPath == "" {
+		return "", fmt.Errorf("release '%s' is not installed", release)
 	}
 
 	file, err := os.Open(filepath.Join(internal.InstallPath, release.pathName, "resources", "build_info.json"))
@@ -385,10 +375,6 @@ func (release *release) getState() *ReleaseState {
 		return nil
 	}
 
-	if !release.isInstalled() && state.Status == string(statusNone) {
-		return nil
-	}
-
 	return state
 }
 
@@ -470,18 +456,11 @@ func (release *release) checkForUpdates() {
 }
 
 func (release *release) install() {
-	// can't use `takeOver` because it fails if not installed
-	release.mu.Lock()
-	defer release.mu.Unlock()
-
-	installed := release.isInstalled()
-
-	internal, err := release.getInternal()
-	if installed && err != nil || release.status == statusFatal {
+	internal, reset := release.takeOver()
+	if internal == nil || reset == nil {
 		return
 	}
-
-	defer release.resetState(true)
+	defer reset()
 
 	// even if installing Discord fails for whatever reason,
 	// BetterDiscord should still be updated
@@ -489,13 +468,15 @@ func (release *release) install() {
 		go release.applyBd()
 	}()
 
+	installed := internal.InstallPath != ""
+
 	version, err := release.getVersion()
 	if installed && err != nil {
 		release.err = fmt.Errorf("error getting installed version: %w", err)
 		release.updateState(true)
 		return
 	}
-	if installed && version == internal.LatestVersion {
+	if installed && internal.LatestVersion != "" && version == internal.LatestVersion {
 		return
 	}
 
@@ -698,7 +679,6 @@ func (release *release) install() {
 	if !installed {
 		release.setInternal(&releaseInternal{
 			InstallPath: installPath,
-			LastChecked: time.Now(), // todo this is silly if we're using a cached tarball and signals that whether a release is installed should not be determined by the presence of its gob/internal data
 			BdChannel:   bdStable,
 		})
 	}
@@ -750,6 +730,10 @@ func (release *release) move(path string) {
 		return
 	}
 	defer reset()
+
+	if internal.InstallPath == "" {
+		return
+	}
 
 	oldPath := filepath.Join(internal.InstallPath, release.pathName)
 	newPath := filepath.Join(path, release.pathName)
@@ -817,6 +801,10 @@ func (release *release) uninstall() {
 	}
 	defer reset()
 
+	if internal.InstallPath == "" {
+		return
+	}
+
 	path := filepath.Join(internal.InstallPath, release.pathName)
 
 	release.status = statusUninstall
@@ -842,13 +830,6 @@ func (release *release) uninstall() {
 		release.updateState(true)
 	}
 
-	if err := os.Remove(release.getGobPath()); err != nil {
-		fmt.Fprintf(os.Stderr, "error deleting gob for release '%s': %s\n", release, err)
-		release.status = statusFatal
-		release.message = "Failed to delete internal data at '" + release.getGobPath() + "'"
-		release.err = err
-		release.updateState(true)
-	}
 	release.updateState(true)
 }
 

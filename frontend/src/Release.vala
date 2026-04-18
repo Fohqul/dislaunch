@@ -150,8 +150,8 @@ public Release (Adw.ApplicationWindow application_window, ReleaseChannel channel
 	Socket.on_state ((state) => refresh (channel.to_state (state.backend_state)));
 }
 
-private void refresh (ReleaseState? state) {
-	if (state == null || state.version == "" || state.internal == null) {
+private void refresh (ReleaseState state) {
+	if (state.version == "" || state.internal == null) {
 		view_stack.visible_child_name = "install";
 		return;
 	}

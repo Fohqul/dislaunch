@@ -224,7 +224,7 @@ private void refresh (SocketState state) {
 
 	for (uint8 i = 0; i < channels.length; ++i) {
 		var release_state = channels[i].to_state (state.backend_state);
-		var installed = release_state != null && release_state.version != "" && release_state.internal != null;
+		var installed = release_state.version != "" && release_state.internal != null;
 		release_pages[i].needs_attention = installed && release_state.internal.latest_version != "" &&
 			release_state.version != release_state.internal.latest_version;
 	}

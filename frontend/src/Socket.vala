@@ -32,9 +32,9 @@ public struct Configuration {
 }
 
 public struct BackendState {
-	ReleaseState? stable;
-	ReleaseState? ptb;
-	ReleaseState? canary;
+	ReleaseState stable;
+	ReleaseState ptb;
+	ReleaseState canary;
 	Configuration config;
 }
 
@@ -212,11 +212,9 @@ private Value parse_value (Json.Object object, string member, Type type) throws 
 	return node.get_value ();
 }
 
-private void parse_release (Json.Object parent_object, string channel, out ReleaseState? state) throws SocketError {
-	if (!parent_object.has_member (channel)) {
-		state = null;
-		return;
-	}
+private void parse_release (Json.Object parent_object, string channel, out ReleaseState state) throws SocketError {
+	if (!parent_object.has_member (channel))
+		throw new SocketError.INVALID_RESPONSE ("release '%s' is absent", channel);
 
 	var release = parent_object.get_member (channel);
 	if (release.get_node_type () != Json.NodeType.OBJECT)

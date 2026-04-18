@@ -42,8 +42,8 @@ public InstallPage (ReleaseChannel channel) {
 	Socket.on_state ((state) => refresh (channel.to_state (state.backend_state)));
 }
 
-private void refresh (ReleaseState? state) {
-	if (state == null || state.status == "") {
+private void refresh (ReleaseState state) {
+	if (state.status == "") {
 		status_page.title = channel.title + " is not installed";
 		status_page.description = "";
 		status_page.icon_name = "system-software-install-symbolic";

@@ -34,7 +34,7 @@ private ReleaseChannel (string id, string title) {
 	this.title = title;
 }
 
-public ReleaseState ? to_state (BackendState backend_state) {
+public ReleaseState to_state (BackendState backend_state) {
 	if (this == _STABLE)
 		return backend_state.stable;
 	if (this == _PTB)

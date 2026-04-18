@@ -161,7 +161,7 @@ private void refresh (SocketState state) {
 
 	var release_state = channel.to_state (state.backend_state);
 
-	if (release_state == null || release_state.version == "" || release_state.internal == null) {
+	if (release_state.version == "" || release_state.internal == null) {
 		view_stack.visible_child_name = "install";
 		return;
 	}
