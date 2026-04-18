@@ -302,6 +302,7 @@ func (release *release) takeOver() (*releaseInternal, func()) {
 
 	if internal, err := release.getInternal(); err == nil {
 		return &internal, func() {
+			release.setInternal(&internal)
 			release.resetState(true)
 			release.mu.Unlock()
 		}
@@ -387,7 +388,6 @@ func (release *release) setCommandLineArguments(commandLineArguments string) {
 	defer reset()
 
 	internal.CommandLineArguments = commandLineArguments
-	release.setInternal(internal)
 }
 
 func (release *release) setBdEnabled(bdEnabled bool) {
@@ -451,7 +451,6 @@ func (release *release) checkForUpdates() {
 
 	internal.LatestVersion = latestVersion.Name
 	internal.LastChecked = time.Now()
-	release.setInternal(internal)
 
 	release.checkForBdUpdates(internal)
 }
@@ -696,7 +695,6 @@ func (release *release) install() {
 
 	if !installed {
 		internal.InstallPath = installPath
-		release.setInternal(internal)
 	}
 
 	if desktopEntry.Len() == 0 {
@@ -762,7 +760,6 @@ func (release *release) move(path string) {
 	err := os.Rename(oldPath, newPath)
 	if err == nil {
 		internal.InstallPath = path
-		release.setInternal(internal)
 		return
 	}
 
@@ -807,7 +804,6 @@ func (release *release) move(path string) {
 	}
 
 	internal.InstallPath = path
-	release.setInternal(internal)
 }
 
 func (release *release) uninstall() {
@@ -948,7 +944,6 @@ func (release *release) applyBd() {
 				}
 
 				internal.BdInstalledRelease = internal.BdLatestRelease
-				release.setInternal(internal)
 
 				break
 			}
@@ -968,7 +963,6 @@ func (release *release) applyBd() {
 
 		internal.BdInstalledRelease = nil
 		internal.BdLatestRelease = nil
-		release.setInternal(internal)
 	}
 	release.updateState(true)
 
