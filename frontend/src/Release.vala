@@ -5,7 +5,7 @@ private static string css = """
 	}
 	""";
 
-public ReleaseChannel channel { get; private set; }
+private ReleaseChannel channel { get; private set; }
 private Adw.ViewStack view_stack;
 private Adw.ActionRow update_row;
 private ProgressRow update_progress_row;
