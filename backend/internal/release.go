@@ -478,11 +478,7 @@ func (release *release) install() {
 	installed := release.isInstalled()
 
 	internal, err := release.getInternal()
-	if installed && err != nil {
-		return
-	}
-
-	if installed && release.status == statusFatal {
+	if installed && err != nil || release.status == statusFatal {
 		return
 	}
 
