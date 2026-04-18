@@ -694,12 +694,9 @@ func (release *release) install() {
 		return
 	}
 
-	// Even if steps after this fail, still mark release as installed since it's been extracted
 	if !installed {
-		release.setInternal(&releaseInternal{
-			InstallPath: installPath,
-			BdChannel:   bdStable,
-		})
+		internal.InstallPath = installPath
+		release.setInternal(internal)
 	}
 
 	if desktopEntry.Len() == 0 {
