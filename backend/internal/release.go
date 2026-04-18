@@ -484,11 +484,30 @@ func (release *release) install() {
 	release.status = statusInstall
 	release.updateState(true)
 
-	tarballPath := filepath.Join(getHomeXdgDislaunchDirectory("XDG_CACHE_HOME", ".cache"), release.id)
+	cache := getHomeXdgDislaunchDirectory("XDG_CACHE_HOME", ".cache")
+
+	tarballPath := filepath.Join(cache, release.id)
 	if installed {
 		tarballPath += "-" + internal.LatestVersion
 	}
 	tarballPath += ".tar.gz"
+
+	if entries, err := os.ReadDir(cache); err == nil {
+		for _, entry := range entries {
+			if entry.Name() == filepath.Join(cache, tarballPath) {
+				continue
+			}
+
+			path := filepath.Join(cache, entry.Name())
+			if err = os.Remove(path); err != nil {
+				release.err = fmt.Errorf("error removing cached file '%s': %w", path, err)
+				release.updateState(true)
+			}
+		}
+	} else {
+		release.err = fmt.Errorf("error getting entries of cache directory: %w", err)
+		release.updateState(true)
+	}
 
 	if _, err = os.Stat(tarballPath); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
@@ -575,7 +594,6 @@ func (release *release) install() {
 		}
 	}
 
-	// TODO delete previous downloads
 	tarball, err := os.Open(tarballPath)
 	if err != nil {
 		release.err = fmt.Errorf("error opening tarball: %w", err)
