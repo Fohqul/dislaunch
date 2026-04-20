@@ -150,11 +150,6 @@ func newRelease(id string, pathName string, desktopEntryFileName string) *releas
 	release.mu.Lock()
 	defer release.mu.Unlock()
 
-	_, err := release.getInternal()
-	if err == io.EOF {
-		release.setInternal(&releaseInternal{BdChannel: bdStable})
-	}
-
 	release.reset(nil, false)
 
 	return release
@@ -223,6 +218,10 @@ func (release *release) getInternal() (releaseInternal, error) {
 
 	var internal releaseInternal
 	if err := gob.NewDecoder(file).Decode(&internal); err != nil {
+		if err == io.EOF {
+			return releaseInternal{BdChannel: bdStable}, nil
+		}
+
 		release.status = statusFatal
 		release.err = fmt.Errorf("error decoding internal data for release '%s': %w", release, err)
 		return releaseInternal{}, release.err
