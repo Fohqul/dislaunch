@@ -137,6 +137,8 @@ type releaseState struct {
 	Version  string           `json:"version"`
 }
 
+var stableOnce, ptbOnce, canaryOnce sync.Once
+
 var stable, ptb, canary *release
 
 func newRelease(id string, pathName string, desktopEntryFileName string) *release {
@@ -156,23 +158,23 @@ func newRelease(id string, pathName string, desktopEntryFileName string) *releas
 }
 
 func getStable() *release {
-	if stable == nil {
+	stableOnce.Do(func() {
 		stable = newRelease("stable", "Discord", "discord.desktop")
-	}
+	})
 	return stable
 }
 
 func getPtb() *release {
-	if ptb == nil {
+	ptbOnce.Do(func() {
 		ptb = newRelease("ptb", "DiscordPTB", "discord-ptb.desktop")
-	}
+	})
 	return ptb
 }
 
 func getCanary() *release {
-	if canary == nil {
+	canaryOnce.Do(func() {
 		canary = newRelease("canary", "DiscordCanary", "discord-canary.desktop")
-	}
+	})
 	return canary
 }
 
