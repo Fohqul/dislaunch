@@ -299,31 +299,33 @@ private void handle_message (string message) {
 		parse_release (root_object, "ptb", out backend_state.ptb);
 		parse_release (root_object, "canary", out backend_state.canary);
 
-		var config = root_object.get_member ("config");
-		if (config.get_node_type () != Json.NodeType.OBJECT)
-			throw new SocketError.INVALID_RESPONSE (
-				"invalid config node type: %d",
-				config.get_node_type ()
-			);
+		if (root_object.has_member ("config")) {
+			var config = root_object.get_member ("config");
+			if (config.get_node_type () != Json.NodeType.OBJECT)
+				throw new SocketError.INVALID_RESPONSE (
+					"invalid config node type: %d",
+					config.get_node_type ()
+				);
 
-		backend_state.config = {};
-		var config_object = config.get_object ();
-		backend_state.config.automatically_check_for_updates = parse_value (
-			config_object,
-			"automatically_check_for_updates", Type.BOOLEAN
-		).get_boolean ();
-		backend_state.config.notify_on_update_available = parse_value (
-			config_object,
-			"notify_on_update_available", Type.BOOLEAN
-		).get_boolean ();
-		backend_state.config.automatically_install_updates = parse_value (
-			config_object,
-			"automatically_install_updates", Type.BOOLEAN
-		).get_boolean ();
-		backend_state.config.default_install_path = parse_value (
-			config_object, "default_install_path",
-			Type.STRING
-		).get_string ();
+			backend_state.config = {};
+			var config_object = config.get_object ();
+			backend_state.config.automatically_check_for_updates = parse_value (
+				config_object,
+				"automatically_check_for_updates", Type.BOOLEAN
+			).get_boolean ();
+			backend_state.config.notify_on_update_available = parse_value (
+				config_object,
+				"notify_on_update_available", Type.BOOLEAN
+			).get_boolean ();
+			backend_state.config.automatically_install_updates = parse_value (
+				config_object,
+				"automatically_install_updates", Type.BOOLEAN
+			).get_boolean ();
+			backend_state.config.default_install_path = parse_value (
+				config_object, "default_install_path",
+				Type.STRING
+			).get_string ();
+		}
 
 		lock (state) {
 			state.backend_state = backend_state;
