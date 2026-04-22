@@ -165,9 +165,9 @@ func startWriter(conn net.Conn, entry *connectionEntry) {
 				if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
 					entry.cancel()
 					return
-				} else {
-					fmt.Fprintf(os.Stderr, "error writing to connection: %s\nMessage: %s", err, message)
 				}
+
+				fmt.Fprintf(os.Stderr, "error writing to connection: %s\nMessage: %s", err, message)
 			}
 		}
 	}
