@@ -713,7 +713,6 @@ func (release *release) install() {
 		release.progress = uint8(float64(accumulated) / float64(len(dislaunchDesktopEntry)) * 100)
 		release.flush(internal, true)
 	}
-
 }
 
 func (release *release) move(path string) {
