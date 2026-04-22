@@ -1,14 +1,14 @@
 class Application : Adw.Application {
 private static string css =
 	"""
-	.alert {
+	.release-alert {
 		background-color: alpha(var(--error-color), 0.3);
 		margin: 0.8em;
 		border: 1px solid var(--error-bg-color);
 		border-radius: 8px;
 	}
 
-	.alert-title {
+	.release-alert-title {
 		background-color: var(--error-bg-color);
 		color: var(--error-fg-color);
 		font-weight: bold;
@@ -17,15 +17,15 @@ private static string css =
 		border-radius: 6px 6px 0 0;
 	}
 
-	.alert-title label {
+	.release-alert-title label {
 		line-height: 1.0;
 	}
 
-	.alert-title button > image {
+	.release-alert-title button > image {
 		color: var(--error-fg-color);
 	}
 
-	.alert > label {
+	.release-alert > label {
 		margin: 0.6em;
 	}
 	""";
@@ -98,11 +98,11 @@ public override void activate () {
 
 	var release_alert_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
 	release_alert_box.add_css_class ("error");
-	release_alert_box.add_css_class ("alert");
+	release_alert_box.add_css_class ("release-alert");
 	release_alert_revealer.child = release_alert_box;
 
 	var release_alert_title_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
-	release_alert_title_box.add_css_class ("alert-title");
+	release_alert_title_box.add_css_class ("release-alert-title");
 	release_alert_box.append (release_alert_title_box);
 
 	release_alert_title_box.append (
