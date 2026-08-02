@@ -2,6 +2,12 @@
 
 Your last lucky day is here.
 
+## Finally
+
+Finally, [Discord now supports this natively](https://discord.com/blog/discord-patch-notes-may-4-2026#:~:text=Are%20you,installation), rendering this project entirely obsolete.
+
+In addition to being obsoleted, it's also now broken. Around the time they started the port (but before this announcement) their internal APIs drastically changed in a way that broke Dislaunch. Namely, where their endpoints formerly returned a tarball containing the entire self-contained Discord app, they started instead returning a tarball with the updater, which breaks the version of Dislaunch pushed to the repo. Therefore, it is archived.
+
 ## What?
 
 Dislaunch acts as a launcher and an automatic updater for Discord on Linux. Because Discord doesn't automatically download and install the latest versions on Linux as it does on other operating systems, you have to either manually do it yourself after each update or rely on [less than ideal solutions](#why).
