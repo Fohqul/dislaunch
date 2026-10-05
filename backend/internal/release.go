@@ -631,6 +631,10 @@ func (release *release) install() {
 		}
 		defer source.Close()
 
+		if err = os.MkdirAll(filepath.Join(installPath, filepath.Dir(info.NameInArchive)), 0755); err != nil {
+			return fmt.Errorf("error creating parent directories for '%s': %w", info.NameInArchive, err)
+		}
+
 		destination, err := os.OpenFile(filepath.Join(installPath, info.NameInArchive), os.O_CREATE|os.O_WRONLY, info.Mode().Perm())
 		if err != nil {
 			return fmt.Errorf("error opening destination file '%s': %w", filepath.Join(installPath, info.NameInArchive), err)
