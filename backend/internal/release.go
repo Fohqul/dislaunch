@@ -522,7 +522,7 @@ func (release *release) install() {
 
 		file, err := os.OpenFile(downloadPath, os.O_CREATE|os.O_WRONLY, 0600)
 		if err != nil {
-			release.err = fmt.Errorf("error opening tarball download path: %w", err)
+			release.err = fmt.Errorf("error opening tarball download path at '%s': %w", downloadPath, err)
 			return
 		}
 		defer file.Close()
