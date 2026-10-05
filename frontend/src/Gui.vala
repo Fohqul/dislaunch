@@ -16,12 +16,15 @@ int launch (ReleaseChannel channel) {
 
 	var state = channel.to_state (Socket.get_state ().backend_state);
 
-	if (state.internal == null) {
+	if (state.internal == null || state.internal.installed_version == "") {
 		stderr.printf (channel.title + " is not installed, so cannot launch\n");
 		return Posix.EXIT_FAILURE;
 	}
 
-	var executable = "%s/%s/%s".printf (state.internal.install_path, path_name, path_name);
+	var executable = "%s/%s/app-%s/%s".printf (
+		Environment.get_user_config_dir (), path_name.ascii_down (),
+		state.internal.installed_version, path_name
+	);
 
 	string[] command_line_arguments;
 	if (state.internal.command_line_arguments != "")

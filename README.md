@@ -62,3 +62,7 @@ This produces 2 executables, both under `builddir/frontend`: `dislaunch` and `di
 ## AI declaration
 
 Throughout this project (including the old [`discord-linux-updater`](https://github.com/Fohqul/discord-linux-updater)), I've used ChatGPT and Claude for debugging and as a learning aid or for suggestions, ideas and reviews (e.g. I only know that IPC and UNIX sockets are a thing thanks to it). Sometimes I’ve also used AI when I was really stuck on how to solve a specific problem. All that said, I write all the code and consider it my work.
+
+## Honourable mentions
+
+Big thanks to [Discord Userdoccers](https://docs.discord.food)

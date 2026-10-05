@@ -161,7 +161,7 @@ private void refresh (SocketState state) {
 
 	var release_state = channel.to_state (state.backend_state);
 
-	if (release_state.version == "" || release_state.internal == null) {
+	if (release_state.internal == null || release_state.internal.installed_version == "") {
 		view_stack.visible_child_name = "install";
 		return;
 	}
@@ -171,7 +171,7 @@ private void refresh (SocketState state) {
 	switch (release_state.status) {
 	case "":
 		if (last_status == "update_check") {
-			if (release_state.version != release_state.internal.latest_version) {
+			if (release_state.internal.installed_version != release_state.internal.latest_version) {
 				attempts_remaining = 4; // so that `install` may reuse this field
 				channel.command ("install");
 				append_message ("An update is available to " + release_state.internal.latest_version);
@@ -197,7 +197,7 @@ private void refresh (SocketState state) {
 				return;
 			}
 		} else if (last_status == "install") {
-			if (release_state.version == release_state.internal.latest_version) {
+			if (release_state.internal.installed_version == release_state.internal.latest_version) {
 				stdout.printf ("Installed latest version - quitting\n");
 				quit ();
 				return;

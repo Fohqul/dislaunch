@@ -9,13 +9,15 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -73,6 +75,10 @@ func download(ctx context.Context, source string, destination io.Writer, progres
 	return nil
 }
 
+func versionArrayToString(version [3]int) string {
+	return fmt.Sprintf("%d.%d.%d", version[0], version[1], version[2])
+}
+
 type status string
 
 const (
@@ -80,7 +86,6 @@ const (
 	statusInstall     status = "install"
 	statusUpdateCheck status = "update_check"
 	statusBdInjection status = "bd_injection"
-	statusMove        status = "move"
 	statusUninstall   status = "uninstall"
 	// A fatal status indicates that, when a release is installed, something has gone seriously wrong and
 	// the application has reached a state it never should have. Processes should return immediately when
@@ -96,7 +101,7 @@ const (
 )
 
 type releaseInternal struct {
-	InstallPath          string    `json:"install_path"`
+	InstalledVersion     string    `json:"installed_version"`
 	LastChecked          time.Time `json:"last_checked"`
 	LatestVersion        string    `json:"latest_version"`
 	CommandLineArguments string    `json:"command_line_arguments"`
@@ -134,7 +139,6 @@ type releaseState struct {
 	Error    string `json:"error"`
 
 	Internal *releaseInternal `json:"internal"`
-	Version  string           `json:"version"`
 }
 
 var stableOnce, ptbOnce, canaryOnce sync.Once
@@ -180,6 +184,22 @@ func getCanary() *release {
 
 func (release *release) String() string {
 	return release.id
+}
+
+func (release *release) getInstallPath(version string) (string, error) {
+	if version == "" {
+		return "", nil
+	}
+
+	config, err := os.UserConfigDir()
+	if err != nil {
+		release.status = statusFatal
+		release.err = fmt.Errorf("error getting user config directory: %w", err)
+		release.flush(nil, true)
+		return "", release.err
+	}
+
+	return filepath.Join(config, strings.ToLower(release.pathName), "app-"+version), nil
 }
 
 // Any errors in dealing with internal release data
@@ -253,38 +273,6 @@ func (release *release) setInternal(internal *releaseInternal) error {
 	return nil
 }
 
-/**
- * Since Discord installs expose their version in `resources/build_info.json`,
- * we can always just read from there to get the installed version without the
- * need to keep track of it ourselves.
- */
-
-func (release *release) getVersion(internal *releaseInternal) (string, error) {
-	if internal.InstallPath == "" {
-		return "", fmt.Errorf("release '%s' is not installed", release)
-	}
-
-	file, err := os.Open(filepath.Join(internal.InstallPath, release.pathName, "resources", "build_info.json"))
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	var buildInfo struct {
-		Version        string `json:"version"`
-		ReleaseChannel string `json:"releaseChannel"`
-	}
-	if err = json.UnmarshalRead(file, &buildInfo); err != nil {
-		return "", err
-	}
-	if buildInfo.ReleaseChannel != release.id {
-		release.status = statusFatal
-		release.err = fmt.Errorf("mismatched release channel: %s", buildInfo.ReleaseChannel)
-		return "", release.err
-	}
-	return buildInfo.Version, nil
-}
-
 func (release *release) takeOver() (*releaseInternal, func()) {
 	release.mu.Lock()
 
@@ -312,6 +300,7 @@ func (release *release) flush(internal *releaseInternal, broadcast bool) {
 	}
 
 	if release.err != nil {
+		slog.Error(release.err.Error())
 		state.Error = release.err.Error()
 	}
 
@@ -319,12 +308,6 @@ func (release *release) flush(internal *releaseInternal, broadcast bool) {
 		state.Internal = internal
 	} else if internal, err := release.getInternal(); err == nil {
 		state.Internal = &internal
-	}
-
-	if state.Internal != nil {
-		if version, err := release.getVersion(state.Internal); err == nil {
-			state.Version = version
-		}
 	}
 
 	release.state.Store(state)
@@ -417,6 +400,54 @@ func (release *release) setBdChannel(bdChannel bdChannel) {
 	release.checkForBdUpdates(internal)
 }
 
+type manifestPackageVersion struct {
+	HostVersion   [3]int `json:"host_version"`
+	ModuleVersion *int   `json:"module_version"`
+	PackageSha256 string `json:"package_sha256"`
+	Url           string `json:"url"`
+}
+
+type manifestPackage struct {
+	Full   manifestPackageVersion   `json:"full"`
+	Deltas []manifestPackageVersion `json:"deltas"`
+}
+
+type manifest struct {
+	manifestPackage
+	Modules         map[string]manifestPackage `json:"modules"`
+	RequiredModules []string                   `json:"required_modules"`
+	MetadataVersion *int                       `json:"metadata_version"`
+	RequiredUpdate  bool                       `json:"required_update"`
+}
+
+func (release *release) getLatestManifest(internal *releaseInternal) (manifest, error) {
+	var buffer bytes.Buffer
+
+	if err := download(release.ctx, "https://updates.discord.com/distributions/app/manifests/latest?platform=linux&arch=x64&channel="+release.id, &buffer, func(progress uint8) {
+		release.progress = progress
+		release.flush(internal, true)
+	}); err != nil {
+		release.err = fmt.Errorf("error downloading latest manifest for '%s': %w", release, err)
+		release.flush(internal, true)
+		return manifest{}, release.err
+	}
+
+	var latestManifest manifest
+	if err := json.UnmarshalRead(&buffer, &latestManifest); err != nil {
+		release.err = fmt.Errorf("error decoding latest manifest for '%s': %w", release, err)
+		release.flush(internal, true)
+		return manifest{}, release.err
+	}
+
+	internal.LatestVersion = versionArrayToString(latestManifest.Full.HostVersion)
+	internal.LastChecked = time.Now()
+	if err := release.setInternal(internal); err != nil {
+		return manifest{}, err
+	}
+
+	return latestManifest, nil
+}
+
 func (release *release) checkForUpdates() {
 	internal, reset := release.takeOver()
 	if internal == nil || reset == nil {
@@ -429,25 +460,144 @@ func (release *release) checkForUpdates() {
 	release.progress = 101
 	release.flush(internal, true)
 
-	var buffer bytes.Buffer
-	if err := download(release.ctx, "https://discord.com/api/"+release.id+"/updates?platform=linux", &buffer, nil); err != nil {
-		release.err = fmt.Errorf("error downloading latest version info: %w", err)
+	if _, err := release.getLatestManifest(internal); err != nil {
 		return
 	}
-
-	var latestVersion struct {
-		Name string `json:"name"`
-		// `pub_date` isn't used
-	}
-	if err := json.UnmarshalRead(&buffer, &latestVersion); err != nil {
-		release.err = fmt.Errorf("error decoding latest version info: %w", err)
-		return
-	}
-
-	internal.LatestVersion = latestVersion.Name
-	internal.LastChecked = time.Now()
 
 	release.checkForBdUpdates(internal)
+}
+
+func (release *release) downloadDistro(internal *releaseInternal, manifest manifestPackageVersion, destination string) error {
+	if _, err := os.Stat(destination); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("error getting stat of path '%s': %w", destination, err)
+	}
+
+	downloadPath := destination + ".part"
+	if err := os.Remove(downloadPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("error deleting previously partially downloaded distro at '%s': %w", downloadPath, err)
+	}
+
+	file, err := os.OpenFile(downloadPath, os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return fmt.Errorf("error opening distro download path at '%s': %w", downloadPath, err)
+	}
+	defer file.Close()
+
+	if err = download(release.ctx, manifest.Url, file, func(progress uint8) {
+		release.progress = progress
+		release.flush(internal, true)
+	}); err != nil {
+		release.err = fmt.Errorf("error downloading '%s': %w", manifest.Url, err)
+		release.flush(internal, true)
+		if err := os.Remove(downloadPath); err != nil {
+			release.err = fmt.Errorf("error deleting partially downloaded distro: %w", err)
+			release.flush(internal, true)
+		}
+		return err // todo handle temporary/recoverable errors
+	}
+
+	if err = os.Rename(downloadPath, destination); err != nil {
+		return fmt.Errorf("error renaming downloaded distro at '%s': %w", downloadPath, err)
+	}
+
+	return nil
+}
+
+func (release *release) extractDistro(internal *releaseInternal, cachePath string, extractionPath string) error {
+	distro, err := os.Open(cachePath)
+	if err != nil {
+		return fmt.Errorf("error opening distro at '%s': %w", cachePath, err)
+	}
+	defer distro.Close()
+
+	defer func() {
+		// in case anything immediately returned without updating,
+		// assuming that `reset` would automatically do so
+		release.flush(internal, true)
+
+		// Even if extraction failed, that implies a possibly corrupted distro, so still remove it
+		if err = os.Remove(cachePath); err != nil {
+			release.err = fmt.Errorf("error deleting distro at '%s': %w", cachePath, err)
+			release.flush(internal, true)
+		}
+	}()
+
+	format := archives.CompressedArchive{
+		Extraction:  archives.Tar{},
+		Compression: archives.Brotli{},
+	}
+	if err = format.Extract(release.ctx, distro, func(ctx context.Context, info archives.FileInfo) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		if !strings.HasPrefix(info.NameInArchive, "files/") {
+			log.Println("Skipping extraction of " + info.NameInArchive)
+			return nil
+		}
+
+		name := info.NameInArchive[len("files/"):]
+
+		release.message = "Extracting " + name
+
+		if info.IsDir() {
+			if err = os.MkdirAll(filepath.Join(extractionPath, name), info.Mode().Perm()); err != nil {
+				return fmt.Errorf("error creating extracted directory '%s': %w", name, err)
+			}
+			return nil
+		}
+
+		source, err := info.Open()
+		if err != nil {
+			return fmt.Errorf("error opening extracted file '%s': %w", info.NameInArchive, err)
+		}
+		defer source.Close()
+
+		if err = os.MkdirAll(filepath.Join(extractionPath, filepath.Dir(name)), 0755); err != nil {
+			return fmt.Errorf("error creating parent directories for '%s': %w", name, err)
+		}
+
+		destination, err := os.OpenFile(filepath.Join(extractionPath, name), os.O_CREATE|os.O_WRONLY, info.Mode().Perm())
+		if err != nil {
+			return fmt.Errorf("error opening destination file '%s': %w", filepath.Join(extractionPath, name), err)
+		}
+		defer destination.Close()
+
+		buffer := make([]byte, 32*1024)
+		accumulated := 0
+		finished := false
+		for !finished {
+			n, err := source.Read(buffer)
+			if err != nil {
+				if err != io.EOF {
+					return fmt.Errorf("error reading extracted file '%s': %w", info.NameInArchive, err)
+				}
+
+				finished = true
+			}
+			accumulated += n
+			release.progress = uint8(float64(accumulated) / float64(info.Size()) * 100)
+			release.flush(internal, true)
+
+			if _, err = destination.Write(buffer[:n]); err != nil {
+				return fmt.Errorf("error writing extracted file '%s': %w", name, err)
+			}
+		}
+
+		return nil
+	}); err != nil {
+		release.err = fmt.Errorf("error extracting tarball: %w", err)
+		release.flush(internal, true)
+		// TODO do this atomically by extracting into a tmpdir and renaming on success instead of overwriting preexisting install in case of failure
+		if err := os.RemoveAll(extractionPath); err != nil {
+			release.err = fmt.Errorf("error removing extracted tarball: %w", err)
+		}
+		return err
+	}
+
+	return nil
 }
 
 func (release *release) install() {
@@ -463,14 +613,14 @@ func (release *release) install() {
 		go release.applyBd()
 	}()
 
-	installed := internal.InstallPath != ""
+	installed := internal.InstalledVersion != ""
 
-	version, err := release.getVersion(internal)
-	if installed && err != nil {
-		release.err = fmt.Errorf("error getting installed version: %w", err)
+	manifest, err := release.getLatestManifest(internal)
+	if err != nil {
 		return
 	}
-	if installed && internal.LatestVersion != "" && version == internal.LatestVersion {
+
+	if installed && internal.LatestVersion != "" && internal.InstalledVersion == internal.LatestVersion {
 		return
 	}
 
@@ -483,21 +633,39 @@ func (release *release) install() {
 		return
 	}
 
-	tarballPath := filepath.Join(cache, release.id)
-	if installed {
-		tarballPath += "-" + internal.LatestVersion
+	moduleCachePath := func(name string, manifest manifestPackageVersion) string {
+		return filepath.Join(cache, fmt.Sprintf("%s-%s-%s-%s.distro", release.id, name, versionArrayToString(manifest.HostVersion), strconv.Itoa(*manifest.ModuleVersion)))
 	}
-	tarballPath += ".tar.gz"
+
+	downloaded := []string{}
+
+	release.message = "Downloading version " + versionArrayToString(manifest.Full.HostVersion)
+	appCachePath := filepath.Join(cache, release.id+"-"+versionArrayToString(manifest.Full.HostVersion)+".distro")
+	if err = release.downloadDistro(internal, manifest.Full, appCachePath); err != nil {
+		release.err = fmt.Errorf("error downloading application: %w", err)
+		return
+	}
+	downloaded = append(downloaded, appCachePath)
+
+	for name, module := range manifest.Modules {
+		release.message = "Downloading module " + name
+
+		cachePath := moduleCachePath(name, module.Full)
+		if err = release.downloadDistro(internal, module.Full, cachePath); err != nil {
+			release.err = fmt.Errorf("error downloading module '%s': %w", name, err)
+			return
+		}
+		downloaded = append(downloaded, cachePath)
+	}
 
 	if entries, err := os.ReadDir(cache); err == nil {
 		for _, entry := range entries {
 			path := filepath.Join(cache, entry.Name())
 
-			if path == tarballPath || !strings.HasPrefix(path, release.id) {
+			if slices.Contains(downloaded, path) || !strings.HasPrefix(path, release.id) {
 				continue
 			}
 
-			path := filepath.Join(cache, entry.Name())
 			if err = os.Remove(path); err != nil {
 				release.err = fmt.Errorf("error removing cached file '%s': %w", path, err)
 				release.flush(internal, true)
@@ -508,53 +676,18 @@ func (release *release) install() {
 		release.flush(internal, true)
 	}
 
-	if _, err = os.Stat(tarballPath); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			release.err = fmt.Errorf("error getting stat of tarball download path: %w", err)
-			return
-		}
-
-		downloadPath := tarballPath + ".part"
-		if err = os.Remove(downloadPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-			release.err = fmt.Errorf("error deleting previous partially downloaded tarball at '%s': %w", downloadPath, err)
-			return
-		}
-
-		file, err := os.OpenFile(downloadPath, os.O_CREATE|os.O_WRONLY, 0600)
-		if err != nil {
-			release.err = fmt.Errorf("error opening tarball download path at '%s': %w", downloadPath, err)
-			return
-		}
-		defer file.Close()
-
-		release.message = "Downloading latest version"
-		if err = download(release.ctx, "https://discord.com/api/download/"+release.id+"?platform=linux&format=tar.gz", file, func(progress uint8) {
-			release.progress = progress
-			release.flush(internal, true)
-		}); err != nil {
-			release.err = fmt.Errorf("error downloading %s %s: %w", release, internal.LatestVersion, err)
-			release.flush(internal, true)
-			if err := os.Remove(downloadPath); err != nil {
-				release.err = fmt.Errorf("error deleting partially downloaded tarball: %w", err)
-			}
-			return // todo handle temporary/recoverable errors
-		}
-
-		if err = os.Rename(downloadPath, tarballPath); err != nil {
-			release.err = fmt.Errorf("error renaming downloaded tarball: %w", err)
-			return
-		}
+	installPath, err := release.getInstallPath(versionArrayToString(manifest.Full.HostVersion))
+	if err != nil {
+		return
 	}
 
-	installPath := internal.InstallPath
-	if installPath == "" {
-		installPath = getConfiguration().DefaultInstallPath
-		if installPath == "" {
-			installPath = getHomeXdgDislaunchDirectory("XDG_DATA_HOME", filepath.Join(".local", "share"))
-		}
+	if err = os.MkdirAll(installPath, 0755); err != nil {
+		release.err = fmt.Errorf("error creating install path at '%s': %w", installPath, err)
+		return
 	}
+
 	if installed {
-		installRealpath, err := filepath.EvalSymlinks(filepath.Join(installPath, release.pathName))
+		installRealpath, err := filepath.EvalSymlinks(installPath)
 		if err != nil {
 			release.err = fmt.Errorf("error getting realpath of install path '%s': %w", filepath.Join(installRealpath, release.pathName), err)
 			return
@@ -586,109 +719,48 @@ func (release *release) install() {
 		}
 	}
 
-	tarball, err := os.Open(tarballPath)
-	if err != nil {
-		release.err = fmt.Errorf("error opening tarball: %w", err)
+	if err = release.extractDistro(internal, appCachePath, installPath); err != nil {
+		release.err = fmt.Errorf("error extracting application: %w", err)
 		return
 	}
-	defer tarball.Close()
 
-	defer func() {
-		// in case anything immediately returned without updating,
-		// assuming that `reset` would automatically do so
+	for name, module := range manifest.Modules {
+		if err = release.extractDistro(internal, moduleCachePath(name, module.Full), filepath.Join(installPath, "modules", name+"-"+strconv.Itoa(*module.Full.ModuleVersion), name)); err != nil {
+			release.err = fmt.Errorf("error extracting module '%s': %w", name, err)
+			return
+		}
+	}
+
+	internal.InstalledVersion = versionArrayToString(manifest.Full.HostVersion)
+
+	icon := filepath.Join(installPath, "discord.png")
+	icons := filepath.Join(getHomeXdgDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "icons")
+	if err = os.MkdirAll(icons, 0755); err == nil {
+		release.message = "Copying icon"
 		release.flush(internal, true)
-
-		// Even if extraction failed, that implies a possibly corrupted tarball, so still remove it
-		if err = os.Remove(tarballPath); err != nil {
-			release.err = fmt.Errorf("error deleting tarball: %w", err)
-			release.flush(internal, true)
-		}
-	}()
-
-	var desktopEntry bytes.Buffer
-
-	format := archives.CompressedArchive{
-		Extraction:  archives.Tar{},
-		Compression: archives.Gz{},
-	}
-	if err = format.Extract(release.ctx, tarball, func(ctx context.Context, info archives.FileInfo) error {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		release.message = "Extracting " + info.NameInArchive
-
-		if info.IsDir() {
-			if err = os.MkdirAll(filepath.Join(installPath, info.NameInArchive), info.Mode().Perm()); err != nil {
-				return fmt.Errorf("error creating extracted directory '%s': %w", info.NameInArchive, err)
-			}
-			return nil
-		}
-
-		source, err := info.Open()
-		if err != nil {
-			return fmt.Errorf("error opening extracted file '%s': %w", info.NameInArchive, err)
-		}
-		defer source.Close()
-
-		if err = os.MkdirAll(filepath.Join(installPath, filepath.Dir(info.NameInArchive)), 0755); err != nil {
-			return fmt.Errorf("error creating parent directories for '%s': %w", info.NameInArchive, err)
-		}
-
-		destination, err := os.OpenFile(filepath.Join(installPath, info.NameInArchive), os.O_CREATE|os.O_WRONLY, info.Mode().Perm())
-		if err != nil {
-			return fmt.Errorf("error opening destination file '%s': %w", filepath.Join(installPath, info.NameInArchive), err)
-		}
-		defer destination.Close()
-
-		buffer := make([]byte, 32*1024)
-		accumulated := 0
-		finished := false
-		for !finished {
-			n, err := source.Read(buffer)
-			if err != nil {
-				if err != io.EOF {
-					return fmt.Errorf("error reading extracted file '%s': %w", info.NameInArchive, err)
-				}
-
-				finished = true
-			}
-			accumulated += n
-			release.progress = uint8(float64(accumulated) / float64(info.Size()) * 100)
-			release.flush(internal, true)
-
-			if _, err = destination.Write(buffer[:n]); err != nil {
-				return fmt.Errorf("error writing extracted file '%s': %w", info.NameInArchive, err)
+		for _, path := range []string{filepath.Join(icons, "256x256"), filepath.Join(icons, "128x128@2")} {
+			if err = os.Mkdir(path, 0755); err != nil && !errors.Is(err, os.ErrNotExist) {
+				release.err = fmt.Errorf("error creating icon subdirectory '%s': %w", path, err)
+				release.flush(internal, true)
+				continue
 			}
 
-			if info.NameInArchive == filepath.Join(release.pathName, release.desktopEntryFileName) {
-				if _, err = desktopEntry.Write(buffer[:n]); err != nil {
-					return fmt.Errorf("error writing desktop entry to buffer: %w", err)
-				}
+			destination := "discord.png"
+			if release == canary {
+				destination = "discord-canary.png"
+			}
+
+			if err = cp.Copy(icon, filepath.Join(path, destination)); err != nil {
+				release.err = fmt.Errorf("error copying icon from '%s' to '%s': %w", icon, path, err)
+				release.flush(internal, true)
 			}
 		}
-
-		return nil
-	}); err != nil {
-		release.err = fmt.Errorf("error extracting tarball: %w", err)
+	} else {
+		release.err = fmt.Errorf("error creating user icon directory '%s': %w", icons, err)
 		release.flush(internal, true)
-		// TODO if already installed, don't delete existing installation - extract first into a temporary dir and, upon finishing extraction without errors, move that into the normal install path
-		if err := os.RemoveAll(filepath.Join(installPath, release.pathName)); err != nil {
-			release.err = fmt.Errorf("error removing extracted tarball: %w", err)
-		}
-		return
 	}
 
-	if !installed {
-		internal.InstallPath = installPath
-	}
-
-	if desktopEntry.Len() == 0 {
-		release.err = fmt.Errorf("error finding desktop file")
-		return
-	}
+	desktopEntry := ""
 
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -698,7 +770,7 @@ func (release *release) install() {
 
 	oldExec := "Exec=" + filepath.Join("/", "usr", "share", release.desktopEntryFileName[:strings.IndexByte(release.desktopEntryFileName, '.')], release.pathName)
 	newExec := "Exec=" + filepath.Join(home, ".local", "bin", "dislaunch") + " " + release.id
-	dislaunchDesktopEntry := strings.ReplaceAll(desktopEntry.String(), oldExec, newExec)
+	dislaunchDesktopEntry := strings.ReplaceAll(desktopEntry, oldExec, newExec)
 
 	dislaunchDesktopEntryFile, err := os.OpenFile(filepath.Join(getHomeXdgDirectory("XDG_DATA_HOME", filepath.Join(".local", "share")), "applications", release.desktopEntryFileName), os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -721,72 +793,6 @@ func (release *release) install() {
 	}
 }
 
-func (release *release) move(path string) {
-	internal, reset := release.takeOver()
-	if internal == nil || reset == nil {
-		return
-	}
-	defer reset()
-
-	if internal.InstallPath == "" {
-		return
-	}
-
-	oldPath := filepath.Join(internal.InstallPath, release.pathName)
-	newPath := filepath.Join(path, release.pathName)
-
-	release.status = statusMove
-	release.message = "Moving to " + newPath
-	release.progress = 101
-	release.flush(internal, true)
-
-	err := os.Rename(oldPath, newPath)
-	if err == nil {
-		internal.InstallPath = path
-		return
-	}
-
-	if err.(*os.LinkError).Err.(syscall.Errno) != syscall.EXDEV {
-		release.err = fmt.Errorf("error moving release '%s' to '%s': %w", release, path, err)
-		return
-	}
-
-	if err = cp.Copy(oldPath, newPath, cp.Options{
-		Sync:          true,
-		PreserveTimes: true,
-		PreserveOwner: true,
-		// HACK: Because we need to report status to the frontend,
-		// we need to run a callback for each file/directory.
-		// The closest this package gives us is this `Skip`
-		// callback which obviously isn't meant for this,
-		// but if it works, it works.
-		Skip: func(_ os.FileInfo, _ string, dest string) (bool, error) {
-			select {
-			case <-release.ctx.Done():
-				return true, release.ctx.Err()
-			default:
-			}
-			release.message = "Copying to " + dest
-			release.flush(internal, true)
-			return false, nil
-		},
-	}); err != nil {
-		release.err = fmt.Errorf("error copying release '%s' to '%s': %w", release, path, err)
-		release.flush(internal, true)
-		if err := os.RemoveAll(newPath); err != nil {
-			release.err = fmt.Errorf("error cleaning up new path: %w", err)
-		}
-		return
-	}
-
-	if err = os.RemoveAll(oldPath); err != nil {
-		release.err = fmt.Errorf("error removing previous install path '%s': %w", oldPath, err)
-		release.flush(internal, true)
-	}
-
-	internal.InstallPath = path
-}
-
 func (release *release) uninstall() {
 	internal, reset := release.takeOver()
 	if internal == nil || reset == nil {
@@ -794,22 +800,25 @@ func (release *release) uninstall() {
 	}
 	defer reset()
 
-	if internal.InstallPath == "" {
+	if internal.InstalledVersion == "" {
 		return
 	}
 
-	path := filepath.Join(internal.InstallPath, release.pathName)
+	installPath, err := release.getInstallPath(internal.InstalledVersion)
+	if err != nil {
+		return
+	}
 
 	release.status = statusUninstall
-	release.message = "Deleting " + path
+	release.message = "Deleting " + installPath
 	release.progress = 101
 	release.flush(internal, true)
 
 	// Scary!
 	// todo perhaps consider some safeguards to prevent deleting critical directories?
-	if err := os.RemoveAll(path); err != nil {
+	if err := os.RemoveAll(installPath); err != nil {
 		release.status = statusFatal
-		release.err = fmt.Errorf("error uninstalling release '%s' from '%s': %w", release, internal.InstallPath, err)
+		release.err = fmt.Errorf("error uninstalling release '%s' from '%s': %w", release, installPath, err)
 		release.flush(internal, true)
 	}
 
@@ -818,6 +827,8 @@ func (release *release) uninstall() {
 		release.err = fmt.Errorf("error deleting desktop entry for release '%s': %w", release, err)
 		release.flush(internal, true)
 	}
+
+	internal.InstalledVersion = ""
 }
 
 func (release *release) checkForBdUpdates(internal *releaseInternal) error {
@@ -857,15 +868,12 @@ func (release *release) applyBd() {
 	}
 	defer reset()
 
-	release.status = statusBdInjection
-	release.flush(internal, true)
-
-	version, err := release.getVersion(internal)
-	if err != nil {
+	if internal.InstalledVersion == "" {
 		return
 	}
 
 	release.status = statusBdInjection
+	release.flush(internal, true)
 
 	// no need to `os.MkdirAll` here, I already do it later
 	config, err := os.UserConfigDir()
@@ -874,7 +882,7 @@ func (release *release) applyBd() {
 		return
 	}
 
-	path := filepath.Join(config, strings.ToLower(release.pathName), version, "modules", "discord_desktop_core")
+	path := filepath.Join(config, strings.ToLower(release.pathName), internal.InstalledVersion, "modules", "discord_desktop_core")
 
 	if internal.BdEnabled {
 		if internal.BdLatestRelease == nil && release.checkForBdUpdates(internal) != nil {

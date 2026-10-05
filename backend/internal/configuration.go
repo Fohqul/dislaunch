@@ -13,10 +13,9 @@ import (
 )
 
 type Configuration struct {
-	AutomaticallyCheckForUpdates bool   `json:"automatically_check_for_updates"`
-	NotifyOnUpdateAvailable      bool   `json:"notify_on_update_available"`
-	AutomaticallyInstallUpdates  bool   `json:"automatically_install_updates"`
-	DefaultInstallPath           string `json:"default_install_path"`
+	AutomaticallyCheckForUpdates bool `json:"automatically_check_for_updates"`
+	NotifyOnUpdateAvailable      bool `json:"notify_on_update_available"`
+	AutomaticallyInstallUpdates  bool `json:"automatically_install_updates"`
 }
 
 func openConfigurationFile(flag int) (*os.File, func()) {
@@ -71,10 +70,6 @@ func getConfiguration() Configuration {
 		}
 	}
 
-	if err := assertWritePermissions(configuration.DefaultInstallPath); err != nil {
-		fmt.Fprintf(os.Stderr, "error writing to configured install location '%s': %s\n", configuration.DefaultInstallPath, err)
-		configuration.DefaultInstallPath = ""
-	}
 	return configuration
 }
 
@@ -127,26 +122,4 @@ func setAutomaticallyInstallUpdates(setting bool) {
 	configuration := getConfiguration()
 	configuration.AutomaticallyInstallUpdates = setting
 	setConfiguration(configuration)
-}
-
-func setDefaultInstallPath(path string) error {
-	mu.Lock()
-	defer mu.Unlock()
-
-	stat, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-	if !stat.IsDir() {
-		return fmt.Errorf("cannot install to non-directory: %s", path)
-	}
-
-	if err = assertWritePermissions(path); err != nil {
-		return err
-	}
-
-	configuration := getConfiguration()
-	configuration.DefaultInstallPath = path
-	setConfiguration(configuration)
-	return nil
 }

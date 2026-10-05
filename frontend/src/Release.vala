@@ -10,8 +10,6 @@ private Adw.ViewStack view_stack;
 private Adw.ActionRow update_row;
 private ProgressRow update_progress_row;
 private Gtk.Button update_button;
-private FolderEntryRow install_path_row;
-private ProgressRow install_path_progress_row;
 private Adw.EntryRow command_line_arguments_row;
 private ProgressRow uninstall_progress_row;
 private Gtk.Button uninstall_button;
@@ -56,16 +54,6 @@ public Release (Adw.ApplicationWindow application_window, ReleaseChannel channel
 		)
 	); // somewhat hacky to determine state using direct properties but oh well
 	update_row.add_suffix (update_button);
-
-	install_path_row = new FolderEntryRow (
-		application_window,
-		File.new_build_filename (Environment.get_user_state_dir (), "io.github.Fohqul.Dislaunch"),
-		(path) => Socket.command ("%s move %s".printf (channel.id, path))
-		) {
-		title = "Install Path"
-	};
-	install_path_progress_row = new ProgressRow (install_path_row);
-	main_preferences_group.add (install_path_progress_row);
 
 	// An apply button must be used here because when we connect to `changed`,
 	// the backend and frontend get stuck in an endless loop, setting each others'
@@ -185,20 +173,20 @@ private void bd_channel_row_selected (Object object, ParamSpec _) {
 }
 
 private void refresh (ReleaseState state) {
-	if (state.version == "" || state.internal == null) {
+	if (state.internal == null || state.internal.installed_version == "") {
 		view_stack.visible_child_name = "install";
 		return;
 	}
 
-	if (state.version != state.internal.latest_version && state.internal.latest_version != "") {
+	if (state.internal.installed_version != state.internal.latest_version && state.internal.latest_version != "") {
 		update_row.title = "Installed version: %s (update available to %s)".printf (
-			state.version,
+			state.internal.installed_version,
 			state.internal.latest_version
 		);
 		update_button.label = "Update";
 		update_button.add_css_class ("suggested-action");
 	} else {
-		update_row.title = "Installed version: " + state.version;
+		update_row.title = "Installed version: " + state.internal.installed_version;
 		update_button.label = "Check for updates";
 		update_button.remove_css_class ("suggested-action");
 	}
@@ -207,12 +195,8 @@ private void refresh (ReleaseState state) {
 	update_progress_row.progress_bar.visible = false;
 	update_button.sensitive = true;
 
-	install_path_progress_row.progress_bar.visible = false;
 	// Checks whether values are different, because otherwise the `Adw.EntryRow`
 	// always thinks the text has changed, and therefore keeps the apply button shown
-	if (install_path_row.text != state.internal.install_path)
-		install_path_row.text = state.internal.install_path;
-
 	if (command_line_arguments_row.text != state.internal.command_line_arguments)
 		command_line_arguments_row.text = state.internal.command_line_arguments;
 
@@ -262,10 +246,6 @@ private void refresh (ReleaseState state) {
 	case "bd_injection":
 		bd_apply_progress_row.progress_bar.progress = state.progress;
 		bd_apply_progress_row.progress_bar.text = text;
-		break;
-	case "move":
-		install_path_progress_row.progress_bar.progress = state.progress;
-		install_path_progress_row.progress_bar.text = text;
 		break;
 	case "uninstall":
 		uninstall_progress_row.progress_bar.progress = state.progress;

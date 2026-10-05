@@ -4,7 +4,7 @@
 // Curious!
 
 public struct ReleaseInternal {
-	string install_path;
+	string installed_version;
 	DateTime last_checked;
 	string latest_version;
 	string command_line_arguments;
@@ -21,14 +21,12 @@ public struct ReleaseState {
 	string error;
 
 	ReleaseInternal? internal;
-	string version;
 }
 
 public struct Configuration {
 	bool automatically_check_for_updates;
 	bool notify_on_update_available;
 	bool automatically_install_updates;
-	string default_install_path;
 }
 
 public struct BackendState {
@@ -236,12 +234,6 @@ private void parse_release (Json.Object parent_object, string channel, out Relea
 	// critical = e;
 	// }
 
-	// try {
-	state.version = parse_value (object, "version", Type.STRING).get_string ();
-	// } catch (Error e) {
-	// critical = e;
-	// }
-
 	if (!object.has_member ("internal")) {
 		state.internal = null;
 		return;
@@ -259,7 +251,10 @@ private void parse_release (Json.Object parent_object, string channel, out Relea
 	state.internal = {};
 	var internal_object = release_internal.get_object ();
 	// try {
-	state.internal.install_path = parse_value (internal_object, "install_path", Type.STRING).get_string ();
+	state.internal.installed_version = parse_value (
+		internal_object, "installed_version",
+		Type.STRING
+	).get_string ();
 	var last_checked = parse_value (internal_object, "last_checked", Type.STRING).get_string ();
 	state.internal.last_checked = new DateTime.from_iso8601 (last_checked, null);
 	if (last_checked != "" && state.internal.last_checked == null)
@@ -321,10 +316,6 @@ private void handle_message (string message) {
 				config_object,
 				"automatically_install_updates", Type.BOOLEAN
 			).get_boolean ();
-			backend_state.config.default_install_path = parse_value (
-				config_object, "default_install_path",
-				Type.STRING
-			).get_string ();
 		}
 
 		lock (state) {

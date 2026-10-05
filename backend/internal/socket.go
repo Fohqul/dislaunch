@@ -76,12 +76,6 @@ func releaseCommand(release *release, data string, command []string) {
 		go release.setCommandLineArguments(data[len(release.String()+" command_line_arguments ") : len(data)-1])
 	case "install":
 		go release.install()
-	case "move":
-		if len(command) < 3 {
-			fmt.Fprintln(os.Stderr, "path required to move release")
-			return
-		}
-		go release.move(command[2])
 	case "uninstall":
 		go release.uninstall()
 	default:
@@ -136,10 +130,6 @@ func startReader(conn net.Conn, entry *connectionEntry) {
 					setBoolean(setNotifyOnUpdateAvailable, argument)
 				case "automatically_install_updates":
 					setBoolean(setAutomaticallyInstallUpdates, argument)
-				case "default_install_path":
-					if err = setDefaultInstallPath(argument); err != nil {
-						fmt.Fprintf(os.Stderr, "error setting default installation path: %s\n", err)
-					}
 				default:
 					fmt.Fprintf(os.Stderr, "unknown configuration option: %s\n", command[1])
 				}

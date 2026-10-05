@@ -3,7 +3,6 @@ private Adw.ExpanderRow automatically_check_for_updates_row;
 private Gtk.Switch automatically_check_for_updates_switch;
 private Gtk.Switch notify_on_update_available_switch;
 private Gtk.Switch automatically_install_updates_switch;
-private FolderEntryRow default_install_path_row;
 
 public ConfigurationPage (Adw.ApplicationWindow application_window) {
 	Object ();
@@ -41,17 +40,6 @@ public ConfigurationPage (Adw.ApplicationWindow application_window) {
 	};
 	automatically_install_updates_row.add_suffix (automatically_install_updates_switch);
 
-	default_install_path_row = new FolderEntryRow (
-		application_window,
-		File.new_build_filename (Environment.get_user_data_dir (), "io.github.Fohqul.Dislaunch"),
-		(path) => Socket.command ("config default_install_path " + path)
-		) {
-		title = "Default install path",
-		tooltip_text =
-			"Defaults to $XDG_DATA_HOME/io.github.Fohqul.Dislaunch if empty.\n\nOnly applies to new installations. For an already installed release, change its path from the main dashboard."
-	};
-	preferences_group.add (default_install_path_row);
-
 	Socket.on_state ((state) => refresh (state.backend_state.config));
 }
 
@@ -85,9 +73,6 @@ private void refresh (Configuration config) {
 	automatically_install_updates_switch.state = config.automatically_install_updates;
 	automatically_install_updates_switch.active = config.automatically_install_updates;
 	automatically_install_updates_switch.state_set.connect (automatically_install_updates_switch_state_set);
-
-	default_install_path_row.text = config.default_install_path ==
-		null ? "" : config.default_install_path;
 }
 
 }

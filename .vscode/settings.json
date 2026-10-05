@@ -1,6 +1,6 @@
 {
   "uncrustify.configPath.linux": "frontend/uncrustify.cfg",
-  "C_Cpp.default.compileCommands": "${workspaceFolder}/builddir/compile_commands.json",
+  "C_Cpp.default.compileCommands": "/home/fohqul/Development/Git/GitHub/Fohqul/dislaunch/builddir/compile_commands.json",
   "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild",
   "[vala]": {
     "editor.defaultFormatter": "zachflower.uncrustify"

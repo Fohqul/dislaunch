@@ -11,13 +11,13 @@ import (
 
 func runInterval(configuration Configuration, release *release) {
 	state := release.getState()
-	if state.Internal == nil || state.Version == "" {
+	if state.Internal == nil || state.Internal.InstalledVersion == "" {
 		return
 	}
 
 	release.checkForUpdates()
 	state = release.getState()
-	if state.Status == statusFatal || state.Internal == nil || state.Version == state.Internal.LatestVersion {
+	if state.Status == statusFatal || state.Internal == nil || state.Internal.InstalledVersion == state.Internal.LatestVersion {
 		return
 	}
 
