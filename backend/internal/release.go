@@ -493,7 +493,7 @@ func (release *release) install() {
 		for _, entry := range entries {
 			path := filepath.Join(cache, entry.Name())
 
-			if path == tarballPath {
+			if path == tarballPath || !strings.HasPrefix(path, release.id) {
 				continue
 			}
 
