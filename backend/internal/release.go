@@ -491,7 +491,9 @@ func (release *release) install() {
 
 	if entries, err := os.ReadDir(cache); err == nil {
 		for _, entry := range entries {
-			if entry.Name() == filepath.Join(cache, tarballPath) {
+			path := filepath.Join(cache, entry.Name())
+
+			if path == tarballPath {
 				continue
 			}
 
